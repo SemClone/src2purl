@@ -87,35 +87,40 @@ class SHPackageIdentifier:
         Returns:
             List of package matches found
         """
-        if self.config.verbose:
-            console.print("[bold blue]Starting package identification...[/bold blue]")
-        
-        # Step 1: Scan directories and generate candidates
-        candidates = await self._scan_directories(path)
-        
-        if not candidates:
+        try:
             if self.config.verbose:
-                console.print("[yellow]No valid directories found to scan[/yellow]")
-            return []
-        
-        # Step 2: Query Software Heritage for matches
-        all_matches = await self._find_matches(candidates)
-        
-        if not all_matches:
+                console.print("[bold blue]Starting package identification...[/bold blue]")
+            
+            # Step 1: Scan directories and generate candidates
+            candidates = await self._scan_directories(path)
+            
+            if not candidates:
+                if self.config.verbose:
+                    console.print("[yellow]No valid directories found to scan[/yellow]")
+                return []
+            
+            # Step 2: Query Software Heritage for matches
+            all_matches = await self._find_matches(candidates)
+            
+            if not all_matches:
+                if self.config.verbose:
+                    console.print("[yellow]No matches found in Software Heritage[/yellow]")
+                return []
+            
+            # Step 3: Process matches and extract package information
+            package_matches = await self._process_matches(all_matches)
+            
+            # Step 4: Sort and deduplicate results
+            final_matches = self._prioritize_and_deduplicate(package_matches)
+            
             if self.config.verbose:
-                console.print("[yellow]No matches found in Software Heritage[/yellow]")
-            return []
-        
-        # Step 3: Process matches and extract package information
-        package_matches = await self._process_matches(all_matches)
-        
-        # Step 4: Sort and deduplicate results
-        final_matches = self._prioritize_and_deduplicate(package_matches)
-        
-        if self.config.verbose:
-            console.print(f"[green]Found {len(final_matches)} package matches[/green]")
-        
-        return final_matches
+                console.print(f"[green]Found {len(final_matches)} package matches[/green]")
+            
+            return final_matches
+        finally:
+            # Clean up the session if it was created
+            if self._sh_client is not None:
+                await self._sh_client.close_session()
     
     async def _scan_directories(self, path: Path) -> List[DirectoryCandidate]:
         """Scan directories and generate SWHID candidates."""

@@ -9,7 +9,7 @@ from shpi.core.config import SHPIConfig
 from shpi.core.orchestrator import SHPackageIdentifier
 
 
-async def test_with_local_directory():
+async def test_with_ffmpeg_directory():
     """Test with a local directory."""
     # You can change this path to point to your FFmpeg clone
     test_path = Path.cwd() / "test_data" / "ffmpeg"
@@ -119,8 +119,8 @@ async def main():
     # Test scanner
     await test_scanner()
     
-    # Test with local directory
-    await test_with_local_directory()
+    # Test with local directory (FFmpeg)
+    await test_with_ffmpeg_directory()
 
 
 if __name__ == "__main__":

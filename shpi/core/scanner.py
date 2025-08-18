@@ -71,16 +71,17 @@ class DirectoryScanner:
         candidates = []
         current = start_path.resolve()
         
-        # Build parent chain up to max_depth
+        # Build parent chain starting from the target directory
         parent_chain = []
+        temp = current
         for depth in range(self.config.max_depth + 1):
-            parent_chain.append((current, depth))
-            if current.parent == current:  # Reached filesystem root
+            parent_chain.append((temp, depth))
+            if temp.parent == temp:  # Reached filesystem root
                 break
-            current = current.parent
+            temp = temp.parent
         
-        # Process from parent to child (parent-first optimization)
-        for path, depth in reversed(parent_chain):
+        # Process from target directory first, then parents
+        for path, depth in parent_chain:
             if not self._is_meaningful_directory(path):
                 continue
             
@@ -139,16 +140,33 @@ class DirectoryScanner:
         if path.name.startswith('.') and path.name != '.':
             return False
         
-        # Count source files
+        # Count source files (including in immediate subdirectories)
         source_file_count = 0
         try:
+            # Check files in the directory itself
             for item in path.iterdir():
                 if item.is_file() and item.suffix in self.SOURCE_EXTENSIONS:
                     source_file_count += 1
                     if source_file_count >= self.config.min_files:
                         return True
+            
+            # If not enough files in root, check immediate subdirectories
+            if source_file_count < self.config.min_files:
+                for subdir in path.iterdir():
+                    if subdir.is_dir() and subdir.name not in self.SKIP_DIRS:
+                        for item in subdir.iterdir():
+                            if item.is_file() and item.suffix in self.SOURCE_EXTENSIONS:
+                                source_file_count += 1
+                                if source_file_count >= self.config.min_files:
+                                    return True
+                            if source_file_count > 10:  # Early exit for performance
+                                return True
         except (PermissionError, OSError):
             return False
+        
+        # Also check for package indicators even with fewer source files
+        if source_file_count > 0 and self._check_package_indicators(path) > 0:
+            return True
         
         return source_file_count >= self.config.min_files
     
