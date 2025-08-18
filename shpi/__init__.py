@@ -6,7 +6,7 @@ by leveraging Software Heritage archive content-addressable hashing.
 """
 
 __version__ = "0.1.0"
-__author__ = "Your Name"
+__author__ = "Oscar Valenzuela B."
 
 from shpi.core.config import SHPIConfig
 
