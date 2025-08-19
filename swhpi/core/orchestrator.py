@@ -24,7 +24,6 @@ class SHPackageIdentifier:
         self._swhid_generator = None
         self._sh_client = None
         self._scanner = None
-        self._fuzzy_matcher = None
         self._coordinate_extractor = None
         self._confidence_scorer = None
         self._purl_generator = None
@@ -319,8 +318,7 @@ class SHPackageIdentifier:
     
     async def _find_fuzzy_matches(self, candidate: DirectoryCandidate) -> List[SHOriginMatch]:
         """Find fuzzy matches using similarity algorithms."""
-        # Placeholder for fuzzy matching implementation
-        # This will be implemented when we add the fuzzy matcher
+        # Not implemented yet - placeholder for Issue #9
         return []
     
     async def _process_matches(

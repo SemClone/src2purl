@@ -203,10 +203,14 @@ class PURLGenerator:
     
     def _extract_gitlab_org_repo(self, url: str) -> Optional[str]:
         """Extract org/repo from GitLab URL."""
-        match = re.search(r'gitlab\.com[:/]([^/]+)/([^/\s]+)', url)
+        match = re.search(r'gitlab\.com[:/]([^/]+)/([^/\s?#]+)', url)
         if match:
             org = match.group(1)
-            repo = match.group(2).rstrip('.git')
+            repo = match.group(2)
+            if repo.endswith('.git'):
+                repo = repo[:-4]
+            if repo.endswith('/'):
+                repo = repo[:-1]
             return f"{org}/{repo}"
         return None
     

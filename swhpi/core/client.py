@@ -11,6 +11,7 @@ from aiohttp import ClientError, ClientTimeout
 from swhpi.core.cache import PersistentCache
 from swhpi.core.config import SWHPIConfig
 from swhpi.core.models import MatchType, SHAPIResponse, SHOriginMatch
+from swhpi.utils.datetime_utils import parse_datetime
 
 
 class SoftwareHeritageClient:
@@ -85,7 +86,7 @@ class SoftwareHeritageClient:
                 origin_match = SHOriginMatch(
                     origin_url=origin.get('url', ''),
                     swhid=swhid,
-                    last_seen=self._parse_datetime(origin.get('last_seen')),
+                    last_seen=parse_datetime(origin.get('last_seen')) or datetime.now(),
                     visit_count=origin.get('visit_count', 1),
                     metadata=origin.get('metadata', {}),
                     match_type=MatchType.EXACT
@@ -98,86 +99,7 @@ class SoftwareHeritageClient:
         
         return origins
     
-    async def get_content_origins(self, content_hash: str) -> List[SHOriginMatch]:
-        """
-        Get origins containing specific file content.
-        
-        Args:
-            content_hash: Content hash
-            
-        Returns:
-            List of origin matches
-        """
-        # Similar to directory origins but for content
-        endpoint = f"/content/sha1:{content_hash}/origins/"
-        response = await self._make_request(endpoint)
-        
-        if not response or not response.data:
-            return []
-        
-        origins = []
-        for origin in response.data:
-            try:
-                origin_match = SHOriginMatch(
-                    origin_url=origin.get('url', ''),
-                    swhid=f"swh:1:cnt:{content_hash}",
-                    last_seen=self._parse_datetime(origin.get('last_seen')),
-                    visit_count=origin.get('visit_count', 1),
-                    metadata=origin.get('metadata', {}),
-                    match_type=MatchType.EXACT
-                )
-                origins.append(origin_match)
-            except Exception as e:
-                if self.config.verbose:
-                    print(f"Error parsing origin {origin}: {e}")
-                continue
-        
-        return origins
     
-    async def get_directory_tree(self, swhid: str) -> Dict[str, Any]:
-        """
-        Get directory structure for fuzzy comparison.
-        
-        Args:
-            swhid: Directory SWHID
-            
-        Returns:
-            Directory tree structure
-        """
-        # Extract hash from SWHID
-        dir_hash = self._extract_hash_from_swhid(swhid)
-        if not dir_hash:
-            return {}
-        
-        endpoint = f"/directory/{dir_hash}/"
-        response = await self._make_request(endpoint)
-        
-        if not response or not response.data:
-            return {}
-        
-        return response.data
-    
-    async def get_directory_file_hashes(self, swhid: str) -> set[str]:
-        """
-        Get all file hashes in directory for content similarity.
-        
-        Args:
-            swhid: Directory SWHID
-            
-        Returns:
-            Set of file content hashes
-        """
-        tree = await self.get_directory_tree(swhid)
-        hashes = set()
-        
-        if isinstance(tree, list):
-            for entry in tree:
-                if entry.get('type') == 'file':
-                    target = entry.get('target')
-                    if target:
-                        hashes.add(target)
-        
-        return hashes
     
     async def _get_directory_info(self, swhid: str) -> Optional[Dict[str, Any]]:
         """Get basic directory information."""
@@ -360,35 +282,3 @@ class SoftwareHeritageClient:
         
         return None
     
-    def _parse_datetime(self, date_str: Any) -> datetime:
-        """
-        Parse datetime from various formats.
-        
-        Args:
-            date_str: Date string or timestamp
-            
-        Returns:
-            Datetime object
-        """
-        if isinstance(date_str, datetime):
-            return date_str
-        
-        if isinstance(date_str, (int, float)):
-            return datetime.fromtimestamp(date_str)
-        
-        if isinstance(date_str, str):
-            try:
-                # Try ISO format first
-                return datetime.fromisoformat(date_str.replace('Z', '+00:00'))
-            except ValueError:
-                pass
-            
-            try:
-                # Try other common formats
-                from datetime import datetime
-                return datetime.strptime(date_str, "%Y-%m-%d %H:%M:%S")
-            except ValueError:
-                pass
-        
-        # Default to now if parsing fails
-        return datetime.now()

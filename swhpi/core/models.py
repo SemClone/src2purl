@@ -18,14 +18,14 @@ class PackageMatch:
     """Represents a package match found in Software Heritage."""
     
     download_url: str
-    name: Optional[str]
-    version: Optional[str]
-    license: Optional[str]
-    sh_url: str
     match_type: MatchType
     confidence_score: float
-    frequency_count: int
-    is_official_org: bool
+    name: Optional[str] = None
+    version: Optional[str] = None
+    license: Optional[str] = None
+    sh_url: Optional[str] = None
+    frequency_count: int = 0
+    is_official_org: bool = False
     purl: Optional[str] = None
     
     def to_dict(self) -> Dict[str, Any]:
@@ -62,10 +62,15 @@ class SHOriginMatch:
     origin_url: str
     swhid: str
     last_seen: datetime
-    visit_count: int
-    metadata: Dict[str, Any]
     match_type: MatchType = MatchType.EXACT
+    visit_count: int = 1
+    metadata: Dict[str, Any] = None
     similarity_score: float = 1.0
+    
+    def __post_init__(self):
+        """Initialize default metadata if None."""
+        if self.metadata is None:
+            self.metadata = {}
 
 
 @dataclass

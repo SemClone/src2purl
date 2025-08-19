@@ -4,6 +4,7 @@ from datetime import datetime, timedelta
 from typing import Any, Dict
 
 from swhpi.core.config import SWHPIConfig
+from swhpi.utils.datetime_utils import parse_datetime
 
 
 class ConfidenceScorer:
@@ -132,17 +133,10 @@ class ConfidenceScorer:
         Returns:
             Recency score between 0 and 1
         """
-        if not last_activity:
+        parsed = parse_datetime(last_activity)
+        if not parsed:
             return 0.5
-        
-        # Convert to datetime if needed
-        if isinstance(last_activity, str):
-            try:
-                last_activity = datetime.fromisoformat(last_activity.replace('Z', '+00:00'))
-            except ValueError:
-                return 0.5
-        elif not isinstance(last_activity, datetime):
-            return 0.5
+        last_activity = parsed
         
         # Calculate days since last activity
         now = datetime.now(last_activity.tzinfo) if last_activity.tzinfo else datetime.now()
@@ -204,17 +198,10 @@ class ConfidenceScorer:
         Returns:
             Multiplier value
         """
-        if not last_activity:
+        parsed = parse_datetime(last_activity)
+        if not parsed:
             return 1.0
-        
-        # Convert to datetime if needed
-        if isinstance(last_activity, str):
-            try:
-                last_activity = datetime.fromisoformat(last_activity.replace('Z', '+00:00'))
-            except ValueError:
-                return 1.0
-        elif not isinstance(last_activity, datetime):
-            return 1.0
+        last_activity = parsed
         
         # Calculate days since last activity
         now = datetime.now(last_activity.tzinfo) if last_activity.tzinfo else datetime.now()
