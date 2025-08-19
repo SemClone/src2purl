@@ -1,6 +1,7 @@
 """Main orchestrator for the SH Package Identifier."""
 
 import asyncio
+from datetime import datetime
 from pathlib import Path
 from typing import List, Optional
 
@@ -8,7 +9,7 @@ from rich.console import Console
 from rich.progress import Progress, SpinnerColumn, TextColumn
 
 from swhpi.core.config import SWHPIConfig
-from swhpi.core.models import DirectoryCandidate, PackageMatch, SHOriginMatch
+from swhpi.core.models import DirectoryCandidate, MatchType, PackageMatch, SHOriginMatch
 
 console = Console()
 
@@ -104,8 +105,16 @@ class SHPackageIdentifier:
             
             if not all_matches:
                 if self.config.verbose:
-                    console.print("[yellow]No matches found in Software Heritage[/yellow]")
-                return []
+                    console.print("[yellow]No exact matches found - trying keyword search[/yellow]")
+                
+                # Try keyword search as fallback
+                keyword_matches = await self._find_keyword_matches(path)
+                if keyword_matches:
+                    all_matches = keyword_matches
+                else:
+                    if self.config.verbose:
+                        console.print("[yellow]No matches found in Software Heritage[/yellow]")
+                    return []
             
             # Step 3: Process matches and extract package information
             package_matches = await self._process_matches(all_matches)
@@ -320,6 +329,54 @@ class SHPackageIdentifier:
         """Find fuzzy matches using similarity algorithms."""
         # Not implemented yet - placeholder for Issue #9
         return []
+    
+    async def _find_keyword_matches(self, path: Path) -> List[SHOriginMatch]:
+        """Find matches by searching for project name keywords."""
+        # Extract potential project name from path
+        project_name = path.name
+        parent_name = path.parent.name if path.parent != path.parent.parent else None
+        
+        keywords_to_try = [project_name]
+        if parent_name and parent_name not in ['test_data', 'Projects', 'src', 'tmp']:
+            keywords_to_try.append(parent_name)
+        
+        all_origin_urls = set()
+        origin_matches = []
+        
+        for keyword in keywords_to_try:
+            if self.config.verbose:
+                console.print(f"[dim]Searching for origins with keyword: {keyword}[/dim]")
+            
+            try:
+                origins = await self.sh_client.search_origins_by_keyword(keyword)
+                
+                for origin_data in origins:
+                    url = origin_data.get('url', '')
+                    if url and url not in all_origin_urls:
+                        all_origin_urls.add(url)
+                        
+                        # Create a match for each origin found
+                        origin_match = SHOriginMatch(
+                            origin_url=url,
+                            swhid="",  # No specific SWHID since this is keyword search
+                            last_seen=datetime.now(),
+                            visit_count=1,
+                            metadata={'keyword_match': keyword},
+                            match_type=MatchType.FUZZY,
+                            similarity_score=0.5  # Lower score for keyword matches
+                        )
+                        origin_matches.append(origin_match)
+                        
+                        if self.config.verbose and len(origin_matches) <= 3:
+                            console.print(f"  [green]→ Found: {url}[/green]")
+            except Exception as e:
+                if self.config.verbose:
+                    console.print(f"[red]Error searching for keyword {keyword}: {e}[/red]")
+        
+        if self.config.verbose and origin_matches:
+            console.print(f"[green]Found {len(origin_matches)} potential matches via keyword search[/green]")
+        
+        return origin_matches[:10]  # Limit to top 10 matches
     
     async def _process_matches(
         self, matches: List[SHOriginMatch]

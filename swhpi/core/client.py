@@ -59,6 +59,24 @@ class SoftwareHeritageClient:
             await self.session.close()
             self.session = None
     
+    async def search_origins_by_keyword(self, keyword: str) -> List[Dict[str, Any]]:
+        """
+        Search for origins by keyword.
+        
+        Args:
+            keyword: Keyword to search for
+            
+        Returns:
+            List of origin data
+        """
+        endpoint = f"/origin/search/{keyword}/"
+        response = await self._make_request(endpoint)
+        
+        if not response or not response.data:
+            return []
+        
+        return response.data if isinstance(response.data, list) else [response.data]
+    
     async def get_directory_origins(self, swhid: str) -> List[SHOriginMatch]:
         """
         Get all origins containing this directory.
