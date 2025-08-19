@@ -51,11 +51,16 @@ dev = [
 ]
 swhid = [
     "miniswhid>=0.1.0",
+    "swh.model>=6.0.0",
+]
+enhanced = [
+    "oslili>=0.1.0",
 ]
 
 
 [project.scripts]
 swhpi = "swhpi.cli.main:main"
+swhpi-validate = "swhpi.cli.validate:validate_swhid"
 
 [tool.setuptools.packages.find]
 where = ["."]
