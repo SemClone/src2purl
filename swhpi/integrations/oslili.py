@@ -6,7 +6,7 @@ Identification Library) tool for more accurate license detection in packages.
 
 import subprocess
 from pathlib import Path
-from typing import Dict, List, Optional, Set
+from typing import Any, Dict, List, Optional, Set
 
 try:
     import oslili
