@@ -4,7 +4,7 @@ import re
 from typing import Dict, List, Optional
 from urllib.parse import urlparse
 
-from shpi.core.models import SHOriginMatch
+from swhpi.core.models import SHOriginMatch
 
 
 class PackageCoordinateExtractor:

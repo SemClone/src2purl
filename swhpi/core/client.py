@@ -8,14 +8,15 @@ from typing import Any, Dict, List, Optional
 import aiohttp
 from aiohttp import ClientError, ClientTimeout
 
-from shpi.core.config import SHPIConfig
-from shpi.core.models import MatchType, SHAPIResponse, SHOriginMatch
+from swhpi.core.cache import PersistentCache
+from swhpi.core.config import SWHPIConfig
+from swhpi.core.models import MatchType, SHAPIResponse, SHOriginMatch
 
 
 class SoftwareHeritageClient:
     """Handles all interactions with Software Heritage API."""
     
-    def __init__(self, config: SHPIConfig):
+    def __init__(self, config: SWHPIConfig):
         """
         Initialize the Software Heritage client.
         
@@ -24,7 +25,15 @@ class SoftwareHeritageClient:
         """
         self.config = config
         self.session: Optional[aiohttp.ClientSession] = None
-        self.cache: Dict[str, SHAPIResponse] = {} if config.cache_enabled else None
+        # Use persistent cache if enabled
+        if config.cache_enabled:
+            self.cache = PersistentCache()
+            # Clean expired entries on startup
+            removed = self.cache.clean_expired()
+            if removed > 0 and config.verbose:
+                print(f"Cleaned {removed} expired cache entries")
+        else:
+            self.cache = None
         self._rate_limiter = asyncio.Semaphore(5)  # Max 5 concurrent requests
         self._last_request_time = 0
     
@@ -222,11 +231,18 @@ class SoftwareHeritageClient:
         """
         # Check cache first
         cache_key = f"{endpoint}:{json.dumps(params or {}, sort_keys=True)}"
-        if self.cache and cache_key in self.cache:
-            cached = self.cache[cache_key]
-            if self.config.verbose:
-                print(f"Cache hit for {endpoint}")
-            return cached
+        if self.cache:
+            cached = self.cache.get(cache_key)
+            if cached:
+                if self.config.verbose:
+                    if cached.status == 404:
+                        print(f"Cache hit (404) for {endpoint}")
+                    else:
+                        print(f"Cache hit for {endpoint}")
+                # Return None for cached 404s with None data
+                if cached.status == 404 and cached.data is None:
+                    return None
+                return cached
         
         # Rate limiting
         await self._handle_rate_limiting()
@@ -240,7 +256,8 @@ class SoftwareHeritageClient:
         for retry in range(self.config.max_retries):
             try:
                 async with self._rate_limiter:
-                    async with self.session.get(url, params=params) as response:
+                    timeout = aiohttp.ClientTimeout(total=self.config.request_timeout)
+                    async with self.session.get(url, params=params, timeout=timeout) as response:
                         # Handle different status codes
                         if response.status == 200:
                             data = await response.json()
@@ -253,20 +270,33 @@ class SoftwareHeritageClient:
                             
                             # Cache the result
                             if self.cache is not None:
-                                self.cache[cache_key] = result
+                                self.cache.set(cache_key, result)
                             
                             return result
                         
                         elif response.status == 404:
                             if allow_404:
-                                return SHAPIResponse(
+                                result = SHAPIResponse(
                                     data=[],
                                     headers=dict(response.headers),
                                     status=response.status,
                                     cached=False
                                 )
+                                # Cache 404 responses too to avoid repeated queries
+                                if self.cache is not None:
+                                    self.cache.set(cache_key, result)
+                                return result
                             if self.config.verbose:
                                 print(f"404 Not Found: {url}")
+                            # Cache negative result to avoid repeated queries
+                            if self.cache is not None:
+                                empty_result = SHAPIResponse(
+                                    data=None,
+                                    headers=dict(response.headers),
+                                    status=404,
+                                    cached=False
+                                )
+                                self.cache.set(cache_key, empty_result)
                             return None
                         
                         elif response.status == 429:  # Rate limited
@@ -280,6 +310,12 @@ class SoftwareHeritageClient:
                             if self.config.verbose:
                                 print(f"HTTP {response.status}: {url}")
                             return None
+            
+            except asyncio.TimeoutError:
+                print(f"\n⚠️ Request timeout - Software Heritage API is not responding")
+                print("This may be due to network issues or API overload.")
+                print("Please try again later.")
+                return None
             
             except ClientError as e:
                 if self.config.verbose:

@@ -3,9 +3,9 @@ requires = ["setuptools>=61.0", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "shpi"
+name = "semantic-copycat-swhpi"
 version = "0.1.0"
-description = "SH Package Identifier - Identify package coordinates from source code using Software Heritage"
+description = "Software Heritage Package Identifier - Identify package coordinates from source code using Software Heritage"
 readme = "README.md"
 requires-python = ">=3.9"
 license = {text = "MIT"}
@@ -55,11 +55,11 @@ swhid = [
 
 
 [project.scripts]
-shpi = "shpi.cli.main:main"
+swhpi = "swhpi.cli.main:main"
 
 [tool.setuptools.packages.find]
 where = ["."]
-include = ["shpi*"]
+include = ["swhpi*"]
 
 [tool.black]
 line-length = 100
@@ -85,11 +85,11 @@ warn_unused_ignores = true
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 python_files = ["test_*.py"]
-addopts = "-v --cov=shpi --cov-report=term-missing"
+addopts = "-v --cov=swhpi --cov-report=term-missing"
 asyncio_mode = "auto"
 
 [tool.coverage.run]
-source = ["shpi"]
+source = ["swhpi"]
 omit = ["tests/*", "*/migrations/*", "*/__init__.py"]
 
 [tool.coverage.report]

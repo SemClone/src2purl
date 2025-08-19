@@ -5,7 +5,7 @@ from typing import Dict
 
 
 @dataclass
-class SHPIConfig:
+class SWHPIConfig:
     """Configuration for the SH Package Identifier tool."""
     
     # Directory scanning parameters
@@ -28,6 +28,7 @@ class SHPIConfig:
     # API configuration
     sh_api_base: str = "https://archive.softwareheritage.org/api/1"
     rate_limit_delay: float = 0.5  # Seconds between API calls
+    request_timeout: float = 30.0  # Timeout for API requests in seconds
     max_retries: int = 3
     cache_enabled: bool = True
     

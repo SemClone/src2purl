@@ -4,8 +4,8 @@ import os
 from pathlib import Path
 from typing import List, Optional, Set
 
-from shpi.core.config import SHPIConfig
-from shpi.core.models import DirectoryCandidate
+from swhpi.core.config import SWHPIConfig
+from swhpi.core.models import DirectoryCandidate
 
 
 class DirectoryScanner:
@@ -44,7 +44,7 @@ class DirectoryScanner:
         '.yaml', '.yml', '.json', '.xml', '.toml',
     }
     
-    def __init__(self, config: SHPIConfig, swhid_generator):
+    def __init__(self, config: SWHPIConfig, swhid_generator):
         """
         Initialize the directory scanner.
         

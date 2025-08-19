@@ -3,13 +3,13 @@
 from datetime import datetime, timedelta
 from typing import Any, Dict
 
-from shpi.core.config import SHPIConfig
+from swhpi.core.config import SWHPIConfig
 
 
 class ConfidenceScorer:
     """Calculates confidence scores for package matches."""
     
-    def __init__(self, config: SHPIConfig):
+    def __init__(self, config: SWHPIConfig):
         """
         Initialize the confidence scorer.
         

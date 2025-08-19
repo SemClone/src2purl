@@ -1,4 +1,4 @@
-"""Main CLI entry point for SHPI."""
+"""Main CLI entry point for SWHPI."""
 
 import asyncio
 import json
@@ -11,26 +11,26 @@ from rich.console import Console
 from rich.table import Table
 from tabulate import tabulate
 
-from shpi import __version__
-from shpi.core.config import SHPIConfig
-from shpi.core.models import PackageMatch
-from shpi.core.orchestrator import SHPackageIdentifier
+from swhpi import __version__
+from swhpi.core.config import SWHPIConfig
+from swhpi.core.models import PackageMatch
+from swhpi.core.orchestrator import SHPackageIdentifier
 
 console = Console()
 
 
 @click.command()
-@click.argument("path", type=click.Path(exists=True, path_type=Path))
+@click.argument("path", type=click.Path(exists=True, path_type=Path), required=False)
 @click.option(
     "--max-depth",
     type=int,
-    default=5,
+    default=2,
     help="Maximum parent directory levels to scan",
 )
 @click.option(
     "--confidence-threshold",
     type=float,
-    default=0.65,
+    default=0.3,
     help="Minimum confidence to report matches",
 )
 @click.option(
@@ -50,6 +50,11 @@ console = Console()
     help="Disable API response caching",
 )
 @click.option(
+    "--clear-cache",
+    is_flag=True,
+    help="Clear all cached API responses and exit",
+)
+@click.option(
     "--verbose",
     "-v",
     is_flag=True,
@@ -57,21 +62,37 @@ console = Console()
 )
 @click.version_option(version=__version__)
 def main(
-    path: Path,
+    path: Optional[Path],
     max_depth: int,
     confidence_threshold: float,
     output_format: str,
     no_fuzzy: bool,
     no_cache: bool,
+    clear_cache: bool,
     verbose: bool,
 ) -> None:
     """
-    SH Package Identifier - Identify package coordinates from source code.
+    Software Heritage Package Identifier - Identify package coordinates from source code.
     
     Analyzes the given PATH to identify packages using Software Heritage archive.
     """
+    # Handle cache clearing
+    if clear_cache:
+        from swhpi.core.cache import PersistentCache
+        cache = PersistentCache()
+        cache.clear()
+        stats = cache.get_cache_stats()
+        console.print("[green]✓ Cache cleared successfully[/green]")
+        console.print(f"[dim]Cache directory: {stats['cache_dir']}[/dim]")
+        sys.exit(0)
+    
+    # Require path for normal operation
+    if not path:
+        console.print("[red]Error: PATH argument is required[/red]")
+        sys.exit(1)
+    
     # Create configuration
-    config = SHPIConfig(
+    config = SWHPIConfig(
         max_depth=max_depth,
         report_match_threshold=confidence_threshold,
         cache_enabled=not no_cache,
@@ -81,10 +102,17 @@ def main(
     )
     
     if verbose:
-        console.print(f"[dim]SHPI v{__version__}[/dim]")
+        console.print(f"[dim]SWHPI v{__version__}[/dim]")
         console.print(f"[dim]Analyzing: {path}[/dim]")
         console.print(f"[dim]Max depth: {max_depth}[/dim]")
         console.print(f"[dim]Confidence threshold: {confidence_threshold}[/dim]")
+        
+        # Show cache status
+        if not no_cache:
+            from swhpi.core.cache import PersistentCache
+            cache = PersistentCache()
+            stats = cache.get_cache_stats()
+            console.print(f"[dim]Cache: {stats['entries']} entries ({stats['total_size_mb']} MB)[/dim]")
         console.print()
     
     try:
@@ -108,17 +136,30 @@ def main(
         sys.exit(1)
 
 
-def output_json(matches: list[PackageMatch], config: SHPIConfig) -> None:
+def output_json(matches: list[PackageMatch], config: SWHPIConfig) -> None:
     """Output results as JSON."""
+    match_list = []
+    for match in matches:
+        match_list.append({
+            "name": match.name,
+            "version": match.version,
+            "confidence": round(match.confidence_score, 3),
+            "type": match.match_type.value if match.match_type else "unknown",
+            "url": match.download_url,
+            "purl": match.purl,
+            "license": match.license,
+            "official": match.is_official_org,
+        })
+    
     output = {
-        "matches": [match.to_dict() for match in matches],
+        "matches": match_list,
         "count": len(matches),
         "threshold": config.report_match_threshold,
     }
     print(json.dumps(output, indent=2, default=str))
 
 
-def output_table(matches: list[PackageMatch], config: SHPIConfig) -> None:
+def output_table(matches: list[PackageMatch], config: SWHPIConfig) -> None:
     """Output results as a formatted table."""
     if not matches:
         console.print("[yellow]No package matches found.[/yellow]")

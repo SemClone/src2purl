@@ -1,20 +1,30 @@
-"""SWHID generation using miniswhid."""
+"""SWHID generation using Software Heritage tools."""
 
 import hashlib
 import os
 from pathlib import Path
 from typing import Optional
 
+# Try different SWHID generation methods in order of preference
+HAS_SWH_MODEL = False
+HAS_MINISWHID = False
+
 try:
-    import miniswhid
-    HAS_MINISWHID = True
+    from swh.model.cli import identify
+    from swh.model.hashutil import hash_to_hex
+    from swh.model.from_disk import Directory
+    HAS_SWH_MODEL = True
 except ImportError:
-    HAS_MINISWHID = False
-    import warnings
-    warnings.warn(
-        "miniswhid not available, using fallback SWHID generation. "
-        "Install miniswhid for accurate SWHID generation: pip install miniswhid"
-    )
+    try:
+        import miniswhid
+        HAS_MINISWHID = True
+    except ImportError:
+        import warnings
+        warnings.warn(
+            "No accurate SWHID generation available. "
+            "Install swh.model or miniswhid for accurate SWHID generation: "
+            "pip install swh.model"
+        )
 
 
 class SWHIDGenerator:
@@ -22,14 +32,15 @@ class SWHIDGenerator:
     Generates Software Heritage Identifiers using miniswhid or custom implementation.
     """
     
-    def __init__(self, use_miniswhid: bool = True):
+    def __init__(self, use_swh_model: bool = True):
         """
         Initialize the SWHID generator.
         
         Args:
-            use_miniswhid: Whether to use miniswhid if available
+            use_swh_model: Whether to use swh.model if available
         """
-        self.use_miniswhid = use_miniswhid and HAS_MINISWHID
+        self.use_swh_model = use_swh_model and HAS_SWH_MODEL
+        self.use_miniswhid = (not self.use_swh_model) and HAS_MINISWHID
     
     def generate_directory_swhid(self, path: Path) -> str:
         """
@@ -44,7 +55,9 @@ class SWHIDGenerator:
         if not path.is_dir():
             raise ValueError(f"Path {path} is not a directory")
         
-        if self.use_miniswhid:
+        if self.use_swh_model:
+            return self._generate_with_swh_model(path)
+        elif self.use_miniswhid:
             return self._generate_with_miniswhid(path)
         else:
             return self._generate_fallback(path)
@@ -62,7 +75,16 @@ class SWHIDGenerator:
         if not file_path.is_file():
             raise ValueError(f"Path {file_path} is not a file")
         
-        if self.use_miniswhid:
+        if self.use_swh_model:
+            # Use swh.model for file content
+            try:
+                from swh.model.from_disk import Content
+                content = Content.from_file(path=bytes(file_path))
+                return f"swh:1:cnt:{content.hash}"
+            except Exception as e:
+                print(f"Warning: swh.model failed for {file_path}: {e}")
+                return self._hash_file_content(file_path)
+        elif self.use_miniswhid:
             # Use miniswhid for file content
             try:
                 result = miniswhid.compute_swhid(str(file_path))
@@ -77,6 +99,33 @@ class SWHIDGenerator:
         else:
             # Fallback implementation
             return self._hash_file_content(file_path)
+    
+    def _generate_with_swh_model(self, path: Path) -> str:
+        """
+        Generate SWHID using swh.model library.
+        
+        Args:
+            path: Directory path
+            
+        Returns:
+            SWHID string
+        """
+        try:
+            from swh.model.from_disk import Directory as SWHDirectory
+            from swh.model.swhids import ObjectType
+            
+            # Create a Directory object from the path
+            directory = SWHDirectory.from_disk(path=bytes(path), max_content_length=10**9)
+            
+            # Get the hash
+            dir_hash = directory.hash.hex() if hasattr(directory.hash, 'hex') else str(directory.hash)
+            
+            return f"swh:1:dir:{dir_hash}"
+            
+        except Exception as e:
+            print(f"Warning: swh.model failed for {path}: {e}")
+            print("Falling back to custom implementation")
+            return self._generate_fallback(path)
     
     def _generate_with_miniswhid(self, path: Path) -> str:
         """

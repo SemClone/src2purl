@@ -1,10 +1,10 @@
-# SH Package Identifier (SHPI)
+# Software Heritage Package Identifier (SWHPI)
 
-A Python tool that identifies package coordinates (name, version, license, PURL) from source code directories by leveraging Software Heritage (SH) archive content-addressable hashing and origin metadata.
+A Python tool that identifies package coordinates (name, version, license, PURL) from source code directories by leveraging Software Heritage archive content-addressable hashing and origin metadata.
 
 ## Overview
 
-SHPI helps you identify packages in unknown code by:
+SWHPI helps you identify packages in unknown code by:
 1. Generating Software Heritage Identifiers (SWHIDs) from local directories
 2. Querying the Software Heritage archive to find matching content
 3. Extracting package information from the archive metadata
@@ -12,12 +12,14 @@ SHPI helps you identify packages in unknown code by:
 
 ## Features
 
-- 🔍 **Exact Matching**: Find exact matches using content-based hashing
+- 🔍 **Exact Matching**: Find exact matches using content-based hashing (SWHIDs)
+- 📁 **Subdirectory Matching**: Identifies packages even when only subdirectories match
 - 🎯 **Confidence Scoring**: Multi-factor scoring for match reliability
 - 📦 **Package Coordinate Extraction**: Extract name, version, and license information
 - 🔗 **PURL Generation**: Generate standard Package URLs for high-confidence matches
 - 🚀 **Performance Optimized**: Parent-first scanning and intelligent caching
 - 📊 **Multiple Output Formats**: JSON and table output formats
+- ⏱️ **Timeout Handling**: Clear error messages for network issues and API timeouts
 
 ## Installation
 
@@ -42,26 +44,26 @@ make install-dev
 
 ```bash
 # Identify packages in a directory
-shpi /path/to/source/code
+swhpi /path/to/source/code
 
 # High confidence matches only
-shpi /path/to/source --confidence-threshold 0.85
+swhpi /path/to/source --confidence-threshold 0.85
 
 # JSON output format
-shpi /path/to/source --output-format json
+swhpi /path/to/source --output-format json
 
 # Disable fuzzy matching for speed
-shpi /path/to/source --no-fuzzy
+swhpi /path/to/source --no-fuzzy
 
 # Verbose output for debugging
-shpi /path/to/source --verbose
+swhpi /path/to/source --verbose
 ```
 
 ### Command Line Options
 
 - `path`: Directory path to analyze (required)
-- `--max-depth`: Maximum parent directory levels to scan (default: 5)
-- `--confidence-threshold`: Minimum confidence to report matches (default: 0.65)
+- `--max-depth`: Maximum parent directory levels to scan (default: 2)
+- `--confidence-threshold`: Minimum confidence to report matches (default: 0.3)
 - `--output-format`: Output format: 'json' or 'table' (default: table)
 - `--no-fuzzy`: Disable fuzzy matching for faster execution
 - `--cache`: Enable/disable API response caching (default: enabled)
@@ -72,7 +74,7 @@ shpi /path/to/source --verbose
 ### Project Structure
 
 ```
-shpi/
+swhpi/
 ├── core/           # Core components
 ├── utils/          # Utility functions
 ├── cli/            # Command-line interface
@@ -91,7 +93,7 @@ make test
 pytest tests/unit/test_swhid.py
 
 # Run with coverage
-pytest --cov=shpi --cov-report=html
+pytest --cov=swhpi --cov-report=html
 ```
 
 ### Code Quality
@@ -104,7 +106,7 @@ make lint
 make format
 
 # Type checking
-mypy shpi
+mypy swhpi
 ```
 
 ## Contributing

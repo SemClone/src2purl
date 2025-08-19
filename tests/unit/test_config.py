@@ -1,12 +1,12 @@
 """Tests for configuration management."""
 
 import pytest
-from shpi.core.config import SHPIConfig
+from swhpi.core.config import SWHPIConfig
 
 
 def test_default_config():
     """Test default configuration values."""
-    config = SHPIConfig()
+    config = SWHPIConfig()
     
     assert config.max_depth == 5
     assert config.min_files == 3
@@ -19,7 +19,7 @@ def test_default_config():
 
 def test_custom_config():
     """Test custom configuration values."""
-    config = SHPIConfig(
+    config = SWHPIConfig(
         max_depth=10,
         cache_enabled=False,
         verbose=True
@@ -32,7 +32,7 @@ def test_custom_config():
 
 def test_score_weights():
     """Test score weights configuration."""
-    config = SHPIConfig()
+    config = SWHPIConfig()
     
     assert 'recency' in config.score_weights
     assert 'popularity' in config.score_weights

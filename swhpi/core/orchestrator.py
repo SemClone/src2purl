@@ -7,8 +7,8 @@ from typing import List, Optional
 from rich.console import Console
 from rich.progress import Progress, SpinnerColumn, TextColumn
 
-from shpi.core.config import SHPIConfig
-from shpi.core.models import DirectoryCandidate, PackageMatch, SHOriginMatch
+from swhpi.core.config import SWHPIConfig
+from swhpi.core.models import DirectoryCandidate, PackageMatch, SHOriginMatch
 
 console = Console()
 
@@ -16,9 +16,9 @@ console = Console()
 class SHPackageIdentifier:
     """Main orchestrator class that coordinates all components."""
     
-    def __init__(self, config: Optional[SHPIConfig] = None):
+    def __init__(self, config: Optional[SWHPIConfig] = None):
         """Initialize the package identifier with configuration."""
-        self.config = config or SHPIConfig()
+        self.config = config or SWHPIConfig()
         
         # Components will be lazily initialized
         self._swhid_generator = None
@@ -33,7 +33,7 @@ class SHPackageIdentifier:
     def swhid_generator(self):
         """Lazy load SWHID generator."""
         if self._swhid_generator is None:
-            from shpi.core.swhid import SWHIDGenerator
+            from swhpi.core.swhid import SWHIDGenerator
             self._swhid_generator = SWHIDGenerator()
         return self._swhid_generator
     
@@ -41,7 +41,7 @@ class SHPackageIdentifier:
     def sh_client(self):
         """Lazy load Software Heritage client."""
         if self._sh_client is None:
-            from shpi.core.client import SoftwareHeritageClient
+            from swhpi.core.client import SoftwareHeritageClient
             self._sh_client = SoftwareHeritageClient(self.config)
         return self._sh_client
     
@@ -49,7 +49,7 @@ class SHPackageIdentifier:
     def scanner(self):
         """Lazy load directory scanner."""
         if self._scanner is None:
-            from shpi.core.scanner import DirectoryScanner
+            from swhpi.core.scanner import DirectoryScanner
             self._scanner = DirectoryScanner(self.config, self.swhid_generator)
         return self._scanner
     
@@ -57,7 +57,7 @@ class SHPackageIdentifier:
     def coordinate_extractor(self):
         """Lazy load package coordinate extractor."""
         if self._coordinate_extractor is None:
-            from shpi.core.extractor import PackageCoordinateExtractor
+            from swhpi.core.extractor import PackageCoordinateExtractor
             self._coordinate_extractor = PackageCoordinateExtractor()
         return self._coordinate_extractor
     
@@ -65,7 +65,7 @@ class SHPackageIdentifier:
     def confidence_scorer(self):
         """Lazy load confidence scorer."""
         if self._confidence_scorer is None:
-            from shpi.core.scorer import ConfidenceScorer
+            from swhpi.core.scorer import ConfidenceScorer
             self._confidence_scorer = ConfidenceScorer(self.config)
         return self._confidence_scorer
     
@@ -73,7 +73,7 @@ class SHPackageIdentifier:
     def purl_generator(self):
         """Lazy load PURL generator."""
         if self._purl_generator is None:
-            from shpi.core.purl import PURLGenerator
+            from swhpi.core.purl import PURLGenerator
             self._purl_generator = PURLGenerator()
         return self._purl_generator
     
@@ -131,19 +131,91 @@ class SHPackageIdentifier:
                 console=console,
             ) as progress:
                 task = progress.add_task("Scanning directories...", total=None)
+                
+                # First scan the main path and parents
                 candidates = self.scanner.scan_recursive(path)
+                
+                # Also scan subdirectories for better matching
+                progress.update(task, description="Scanning subdirectories...")
+                subdirs = await self._scan_subdirectories(path)
+                candidates.extend(subdirs)
+                
                 progress.update(task, completed=True)
         else:
             candidates = self.scanner.scan_recursive(path)
+            subdirs = await self._scan_subdirectories(path)
+            candidates.extend(subdirs)
+        
+        # Remove duplicates based on SWHID
+        seen_swhids = set()
+        unique_candidates = []
+        for candidate in candidates:
+            if candidate.swhid not in seen_swhids:
+                seen_swhids.add(candidate.swhid)
+                unique_candidates.append(candidate)
         
         if self.config.verbose:
-            console.print(f"[dim]Generated {len(candidates)} directory candidates[/dim]")
+            console.print(f"[dim]Generated {len(unique_candidates)} unique directory candidates[/dim]")
+            # Show breakdown
+            target_count = sum(1 for c in unique_candidates if c.path == path)
+            parent_count = sum(1 for c in unique_candidates if path in c.path.parents)
+            child_count = sum(1 for c in unique_candidates if c.path.parent == path)
+            
+            if child_count > 0:
+                console.print(f"[dim]  → Target: {target_count}, Parents: {parent_count}, Children: {child_count}[/dim]")
+        
+        return unique_candidates
+    
+    async def _scan_subdirectories(self, path: Path) -> List[DirectoryCandidate]:
+        """Scan immediate subdirectories for better matching."""
+        candidates = []
+        
+        # Priority directories that rarely change
+        priority_dirs = ['cmake', 'docs', 'doc', 'tools', 'packaging', 
+                        'data', 'po', 'translations', 'config', 'scripts']
+        
+        subdirs_checked = 0
+        max_subdirs = 10
+        
+        # Check priority directories first
+        for dir_name in priority_dirs:
+            if subdirs_checked >= max_subdirs:
+                break
+                
+            subdir = path / dir_name
+            if subdir.exists() and subdir.is_dir():
+                try:
+                    from swhpi.core.models import DirectoryCandidate
+                    
+                    file_count = sum(1 for _ in subdir.rglob('*') if _.is_file())
+                    if file_count >= 3:  # Low threshold for subdirs
+                        swhid = self.swhid_generator.generate_directory_swhid(subdir)
+                        
+                        candidate = DirectoryCandidate(
+                            path=subdir,
+                            swhid=swhid,
+                            depth=1,
+                            specificity_score=0.8,  # High score for stable dirs
+                            file_count=file_count
+                        )
+                        candidates.append(candidate)
+                        subdirs_checked += 1
+                        
+                except (PermissionError, OSError):
+                    continue
         
         return candidates
     
     async def _find_matches(self, candidates: List[DirectoryCandidate]) -> List[SHOriginMatch]:
         """Find matches in Software Heritage for all candidates."""
         all_matches = []
+        # Find the most specific path (highest specificity score) as target
+        target_path = max(candidates, key=lambda c: c.specificity_score).path if candidates else None
+        
+        # Track match statistics
+        parent_matches = 0
+        child_matches = 0
+        target_match = False
         
         with Progress(
             SpinnerColumn(),
@@ -157,15 +229,42 @@ class SHPackageIdentifier:
             )
             
             for candidate in candidates:
+                # Determine relationship
+                if target_path:
+                    if candidate.path == target_path:
+                        relationship = "target"
+                    elif candidate.path.parent == target_path:
+                        relationship = "child"
+                    elif target_path in candidate.path.parents:
+                        relationship = "parent"
+                    else:
+                        relationship = "other"
+                else:
+                    relationship = "unknown"
+                
                 # Try exact match first
                 exact_matches = await self._find_exact_matches(candidate)
                 
                 if exact_matches:
                     all_matches.extend(exact_matches)
+                    
+                    # Update statistics
+                    if relationship == "target":
+                        target_match = True
+                    elif relationship == "child":
+                        child_matches += 1
+                    elif relationship == "parent":
+                        parent_matches += 1
+                    
                     if self.config.verbose:
-                        console.print(
-                            f"[green]Found exact match for {candidate.path.name}[/green]"
-                        )
+                        if relationship == "child":
+                            console.print(
+                                f"[green]✓ Found match for subdirectory: {candidate.path.name}[/green]"
+                            )
+                        else:
+                            console.print(
+                                f"[green]Found exact match for {candidate.path.name}[/green]"
+                            )
                     # Early termination on high-confidence exact match
                     if any(self._is_high_confidence_match(m) for m in exact_matches):
                         break
@@ -179,6 +278,21 @@ class SHPackageIdentifier:
                         )
                 
                 progress.update(task, advance=1)
+        
+        # Report match summary
+        if self.config.verbose and (child_matches > 0 or parent_matches > 0):
+            console.print("\n[bold]Match Summary:[/bold]")
+            if target_match:
+                console.print("  [green]✓ Target directory found in archive[/green]")
+            else:
+                console.print("  [yellow]✗ Target directory not found[/yellow]")
+            
+            if child_matches > 0:
+                console.print(f"  [green]✓ {child_matches} subdirectories found in archive[/green]")
+                console.print("    [dim]→ Subdirectory matches indicate partial repository presence[/dim]")
+            
+            if parent_matches > 0:
+                console.print(f"  [blue]ℹ {parent_matches} parent directories checked[/blue]")
         
         return all_matches
     
