@@ -91,11 +91,6 @@ python -m swhpi.cli.validate /path/to/directory --use-fallback --verbose
 
 This project is licensed under the GNU Affero General Public License v3.0 (AGPL-3.0) - see the LICENSE file for details.
 
-## Acknowledgments
-
-- [Software Heritage](https://www.softwareheritage.org/) for the amazing archive
-- The open source community for continuous inspiration
-
 ## Status
 
 This project is currently in active development. See the [Issues](https://github.com/oscarvalenzuelab/semantic-copycat-swh/issues) page for planned features and known issues.
