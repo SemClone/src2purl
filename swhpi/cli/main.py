@@ -55,6 +55,11 @@ console = Console()
     help="Clear all cached API responses and exit",
 )
 @click.option(
+    "--enhance-licenses",
+    is_flag=True,
+    help="Use oslili for enhanced license detection (if available)",
+)
+@click.option(
     "--verbose",
     "-v",
     is_flag=True,
@@ -69,6 +74,7 @@ def main(
     no_fuzzy: bool,
     no_cache: bool,
     clear_cache: bool,
+    enhance_licenses: bool,
     verbose: bool,
 ) -> None:
     """
@@ -118,7 +124,7 @@ def main(
     try:
         # Run the identifier
         identifier = SHPackageIdentifier(config)
-        matches = asyncio.run(identifier.identify_packages(path))
+        matches = asyncio.run(identifier.identify_packages(path, enhance_licenses=enhance_licenses))
         
         # Output results
         if output_format == "json":

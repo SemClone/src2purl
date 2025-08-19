@@ -77,12 +77,13 @@ class SHPackageIdentifier:
             self._purl_generator = PURLGenerator()
         return self._purl_generator
     
-    async def identify_packages(self, path: Path) -> List[PackageMatch]:
+    async def identify_packages(self, path: Path, enhance_licenses: bool = False) -> List[PackageMatch]:
         """
         Main entry point for package identification.
         
         Args:
             path: Directory path to analyze
+            enhance_licenses: Whether to use oslili for license enhancement
             
         Returns:
             List of package matches found
@@ -112,6 +113,17 @@ class SHPackageIdentifier:
             
             # Step 4: Sort and deduplicate results
             final_matches = self._prioritize_and_deduplicate(package_matches)
+            
+            # Step 5: Optionally enhance with oslili license detection
+            if enhance_licenses:
+                try:
+                    from swhpi.integrations.oslili import enhance_with_oslili
+                    final_matches = enhance_with_oslili(final_matches, path)
+                    if self.config.verbose:
+                        console.print("[green]Enhanced licenses with oslili[/green]")
+                except ImportError:
+                    if self.config.verbose:
+                        console.print("[yellow]oslili not available for license enhancement[/yellow]")
             
             if self.config.verbose:
                 console.print(f"[green]Found {len(final_matches)} package matches[/green]")
