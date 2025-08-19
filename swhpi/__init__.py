@@ -5,7 +5,7 @@ A tool for identifying package coordinates from source code directories
 by leveraging Software Heritage archive content-addressable hashing.
 """
 
-__version__ = "0.1.0"
+__version__ = "1.1.1"
 __author__ = "Oscar Valenzuela B."
 
 from swhpi.core.config import SWHPIConfig

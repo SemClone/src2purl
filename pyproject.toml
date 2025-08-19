@@ -4,18 +4,18 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "semantic-copycat-swhpi"
-version = "0.1.0"
+version = "1.1.1"
 description = "Software Heritage Package Identifier - Identify package coordinates from source code using Software Heritage"
 readme = "README.md"
 requires-python = ">=3.9"
-license = {text = "MIT"}
+license = {text = "AGPL-3.0"}
 authors = [
     {name = "Oscar Valenzuela B.", email = "oscar.valenzuela.b@gmail.com"}
 ]
 classifiers = [
     "Development Status :: 3 - Alpha",
     "Intended Audience :: Developers",
-    "License :: OSI Approved :: MIT License",
+    "License :: OSI Approved :: GNU Affero General Public License v3",
     "Programming Language :: Python :: 3",
     "Programming Language :: Python :: 3.9",
     "Programming Language :: Python :: 3.10",

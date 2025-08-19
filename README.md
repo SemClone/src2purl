@@ -18,6 +18,9 @@ SWHPI helps you identify packages in unknown code by:
 - **Package Coordinate Extraction**: Extract name, version, and license information
 - **PURL Generation**: Generate standard Package URLs for high-confidence matches
 - **Performance Optimized**: Parent-first scanning and intelligent caching
+- **Persistent Caching**: File-based cache with 24-hour TTL to avoid API rate limits
+- **SWHID Validation**: Built-in tool to validate and compare SWHID generation
+- **Enhanced License Detection**: Optional integration with oslili for improved license detection
 - **Multiple Output Formats**: JSON and table output formats
 - **Timeout Handling**: Clear error messages for network issues and API timeouts
 
@@ -49,8 +52,27 @@ swhpi /path/to/source --output-format json
 # Disable fuzzy matching for speed
 swhpi /path/to/source --no-fuzzy
 
+# Enable enhanced license detection with oslili
+swhpi /path/to/source --enhance-licenses
+
+# Clear cache and exit
+swhpi --clear-cache
+
 # Verbose output for debugging
 swhpi /path/to/source --verbose
+```
+
+### SWHID Validation
+
+```bash
+# Generate and validate SWHID for a directory
+python -m swhpi.cli.validate /path/to/directory
+
+# Compare against expected SWHID
+python -m swhpi.cli.validate /path/to/directory --expected-swhid swh:1:dir:abc123...
+
+# Use fallback implementation
+python -m swhpi.cli.validate /path/to/directory --use-fallback --verbose
 ```
 
 ### Command Line Options
@@ -60,12 +82,14 @@ swhpi /path/to/source --verbose
 - `--confidence-threshold`: Minimum confidence to report matches (default: 0.3)
 - `--output-format`: Output format: 'json' or 'table' (default: table)
 - `--no-fuzzy`: Disable fuzzy matching for faster execution
-- `--cache`: Enable/disable API response caching (default: enabled)
+- `--no-cache`: Disable API response caching
+- `--clear-cache`: Clear all cached API responses and exit
+- `--enhance-licenses`: Use oslili for enhanced license detection (if available)
 - `--verbose`: Verbose output for debugging
 
 ## License
 
-This project is licensed under the MIT License - see the LICENSE file for details.
+This project is licensed under the GNU Affero General Public License v3.0 (AGPL-3.0) - see the LICENSE file for details.
 
 ## Acknowledgments
 
