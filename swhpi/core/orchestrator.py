@@ -333,12 +333,30 @@ class SHPackageIdentifier:
     async def _find_keyword_matches(self, path: Path) -> List[SHOriginMatch]:
         """Find matches by searching for project name keywords."""
         # Extract potential project name from path
-        project_name = path.name
-        parent_name = path.parent.name if path.parent != path.parent.parent else None
+        # Walk up the path to find the most likely project name
+        parts = path.parts
         
-        keywords_to_try = [project_name]
-        if parent_name and parent_name not in ['test_data', 'Projects', 'src', 'tmp']:
-            keywords_to_try.append(parent_name)
+        # Common subdirectory names to skip
+        skip_dirs = {'packaging', 'src', 'lib', 'bin', 'build', 'dist', 'test', 
+                    'tests', 'test_data', 'Projects', 'tmp', 'temp', 'vendor',
+                    'node_modules', '.git', 'docs', 'doc', 'cmake', 'po', 'data'}
+        
+        keywords_to_try = []
+        
+        # Try to find the project name by walking up the path
+        for i in range(len(parts) - 1, -1, -1):
+            part = parts[i]
+            if part not in skip_dirs and not part.startswith('.'):
+                keywords_to_try.append(part)
+                break
+        
+        # If we didn't find anything, use the immediate parent if it's not a skip dir
+        if not keywords_to_try and path.parent.name not in skip_dirs:
+            keywords_to_try.append(path.parent.name)
+        
+        # As a last resort, use the current directory name if it's not generic
+        if not keywords_to_try and path.name not in skip_dirs:
+            keywords_to_try.append(path.name)
         
         all_origin_urls = set()
         origin_matches = []
@@ -355,6 +373,17 @@ class SHPackageIdentifier:
                     if url and url not in all_origin_urls:
                         all_origin_urls.add(url)
                         
+                        # Calculate similarity score based on URL matching
+                        similarity_score = 0.5  # Base score for keyword match
+                        
+                        # Boost score for official organization matches
+                        if f"{keyword}-org" in url.lower() or f"/{keyword}/{keyword}" in url.lower():
+                            similarity_score = 0.9
+                        elif f"/{keyword}/" in url.lower() or url.lower().endswith(f"/{keyword}"):
+                            similarity_score = 0.7
+                        elif keyword.lower() in url.lower():
+                            similarity_score = 0.6
+                        
                         # Create a match for each origin found
                         origin_match = SHOriginMatch(
                             origin_url=url,
@@ -363,12 +392,12 @@ class SHPackageIdentifier:
                             visit_count=1,
                             metadata={'keyword_match': keyword},
                             match_type=MatchType.FUZZY,
-                            similarity_score=0.5  # Lower score for keyword matches
+                            similarity_score=similarity_score
                         )
                         origin_matches.append(origin_match)
                         
                         if self.config.verbose and len(origin_matches) <= 3:
-                            console.print(f"  [green]→ Found: {url}[/green]")
+                            console.print(f"  [green]→ Found: {url} (score: {similarity_score:.2f})[/green]")
             except Exception as e:
                 if self.config.verbose:
                     console.print(f"[red]Error searching for keyword {keyword}: {e}[/red]")
@@ -376,6 +405,8 @@ class SHPackageIdentifier:
         if self.config.verbose and origin_matches:
             console.print(f"[green]Found {len(origin_matches)} potential matches via keyword search[/green]")
         
+        # Sort by similarity score (highest first) and return top matches
+        origin_matches.sort(key=lambda x: x.similarity_score, reverse=True)
         return origin_matches[:10]  # Limit to top 10 matches
     
     async def _process_matches(
