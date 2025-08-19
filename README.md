@@ -12,14 +12,14 @@ SWHPI helps you identify packages in unknown code by:
 
 ## Features
 
-- 🔍 **Exact Matching**: Find exact matches using content-based hashing (SWHIDs)
-- 📁 **Subdirectory Matching**: Identifies packages even when only subdirectories match
-- 🎯 **Confidence Scoring**: Multi-factor scoring for match reliability
-- 📦 **Package Coordinate Extraction**: Extract name, version, and license information
-- 🔗 **PURL Generation**: Generate standard Package URLs for high-confidence matches
-- 🚀 **Performance Optimized**: Parent-first scanning and intelligent caching
-- 📊 **Multiple Output Formats**: JSON and table output formats
-- ⏱️ **Timeout Handling**: Clear error messages for network issues and API timeouts
+- **Exact Matching**: Find exact matches using content-based hashing (SWHIDs)
+- **Subdirectory Matching**: Identifies packages even when only subdirectories match
+- **Confidence Scoring**: Multi-factor scoring for match reliability
+- **Package Coordinate Extraction**: Extract name, version, and license information
+- **PURL Generation**: Generate standard Package URLs for high-confidence matches
+- **Performance Optimized**: Parent-first scanning and intelligent caching
+- **Multiple Output Formats**: JSON and table output formats
+- **Timeout Handling**: Clear error messages for network issues and API timeouts
 
 ## Installation
 
@@ -31,12 +31,6 @@ cd semantic-copycat-swh
 pip install -e .
 ```
 
-### For Development
-
-```bash
-pip install -e ".[dev]"
-make install-dev
-```
 
 ## Usage
 
@@ -68,54 +62,6 @@ swhpi /path/to/source --verbose
 - `--no-fuzzy`: Disable fuzzy matching for faster execution
 - `--cache`: Enable/disable API response caching (default: enabled)
 - `--verbose`: Verbose output for debugging
-
-## Development
-
-### Project Structure
-
-```
-swhpi/
-├── core/           # Core components
-├── utils/          # Utility functions
-├── cli/            # Command-line interface
-├── output/         # Output formatters
-├── integrations/   # External integrations
-└── exporters/      # Export formats (SBOM, etc.)
-```
-
-### Running Tests
-
-```bash
-# Run all tests
-make test
-
-# Run specific test file
-pytest tests/unit/test_swhid.py
-
-# Run with coverage
-pytest --cov=swhpi --cov-report=html
-```
-
-### Code Quality
-
-```bash
-# Run linters
-make lint
-
-# Format code
-make format
-
-# Type checking
-mypy swhpi
-```
-
-## Contributing
-
-1. Fork the repository
-2. Create a feature branch (`git checkout -b feature/amazing-feature`)
-3. Commit your changes (`git commit -m 'Add amazing feature'`)
-4. Push to the branch (`git push origin feature/amazing-feature`)
-5. Open a Pull Request
 
 ## License
 
