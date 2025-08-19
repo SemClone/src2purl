@@ -1,0 +1,315 @@
+"""Unified source identification strategies."""
+
+import asyncio
+import os
+from pathlib import Path
+from typing import Dict, List, Optional, Tuple, Any
+from collections import Counter
+
+from rich.console import Console
+from rich.table import Table
+
+from ..core.models import DirectoryCandidate, ContentCandidate
+from ..core.scanner import DirectoryScanner
+from ..core.client import SoftwareHeritageClient
+from .hash_search import HashSearcher
+from .providers import (
+    SearchProviderRegistry,
+    create_default_registry,
+    SCANOSSProvider
+)
+
+console = Console()
+
+
+class SourceIdentifier:
+    """Unified source identification using multiple strategies."""
+    
+    def __init__(
+        self,
+        swh_client: Optional[SoftwareHeritageClient] = None,
+        search_registry: Optional[SearchProviderRegistry] = None,
+        verbose: bool = False
+    ):
+        """Initialize the source identifier.
+        
+        Args:
+            swh_client: Software Heritage client instance
+            search_registry: Registry of search providers
+            verbose: Enable verbose output
+        """
+        if swh_client is None:
+            from ..core.config import SWHPIConfig
+            config = SWHPIConfig(verbose=verbose)
+            swh_client = SoftwareHeritageClient(config)
+        self.swh_client = swh_client
+        self.search_registry = search_registry or create_default_registry(verbose=verbose)
+        self.verbose = verbose
+        self.hash_searcher = HashSearcher(verbose=verbose)
+    
+    async def identify(
+        self,
+        path: Path,
+        max_depth: int = 3,
+        confidence_threshold: float = 0.5,
+        strategies: Optional[List[str]] = None
+    ) -> Dict[str, Any]:
+        """Identify the source of a directory using multiple strategies.
+        
+        Args:
+            path: Path to analyze
+            max_depth: Maximum depth for recursive scanning
+            confidence_threshold: Minimum confidence for identification
+            strategies: List of strategies to use (default: all)
+            
+        Returns:
+            Dictionary with identification results
+        """
+        results = {
+            "path": str(path),
+            "identified": False,
+            "confidence": 0.0,
+            "strategies_used": [],
+            "candidates": [],
+            "final_origin": None
+        }
+        
+        available_strategies = {
+            "swh": self._identify_via_swh,
+            "hash_search": self._identify_via_hash_search,
+            "scanoss": self._identify_via_scanoss,
+            "web_search": self._identify_via_web_search
+        }
+        
+        strategies_to_use = strategies or list(available_strategies.keys())
+        
+        all_candidates = []
+        
+        for strategy_name in strategies_to_use:
+            if strategy_name not in available_strategies:
+                continue
+                
+            strategy_func = available_strategies[strategy_name]
+            
+            try:
+                if self.verbose:
+                    console.print(f"[cyan]Running {strategy_name} strategy...[/cyan]")
+                
+                candidates = await strategy_func(path, max_depth)
+                
+                if candidates:
+                    all_candidates.extend(candidates)
+                    results["strategies_used"].append(strategy_name)
+                    
+                    if self.verbose:
+                        console.print(f"[green]✓ {strategy_name} found {len(candidates)} candidates[/green]")
+                        
+            except Exception as e:
+                if self.verbose:
+                    console.print(f"[yellow]⚠ {strategy_name} failed: {e}[/yellow]")
+        
+        # Aggregate and score candidates
+        if all_candidates:
+            origin_scores = Counter()
+            for candidate in all_candidates:
+                if "origin" in candidate:
+                    origin_scores[candidate["origin"]] += candidate.get("confidence", 1.0)
+            
+            if origin_scores:
+                best_origin, best_score = origin_scores.most_common(1)[0]
+                total_strategies = len(results["strategies_used"])
+                confidence = best_score / total_strategies if total_strategies > 0 else 0
+                
+                if confidence >= confidence_threshold:
+                    results["identified"] = True
+                    results["confidence"] = confidence
+                    results["final_origin"] = best_origin
+                    results["candidates"] = all_candidates[:10]  # Top 10 candidates
+        
+        return results
+    
+    async def _identify_via_swh(
+        self,
+        path: Path,
+        max_depth: int
+    ) -> List[Dict[str, Any]]:
+        """Identify using Software Heritage archive."""
+        candidates = []
+        
+        # Scan directory
+        from ..core.config import SWHPIConfig
+        from ..core.swhid import SWHIDGenerator
+        config = SWHPIConfig(verbose=self.verbose, max_depth=max_depth)
+        scanner = DirectoryScanner(config, SWHIDGenerator())
+        dir_candidates, file_candidates = scanner.scan_recursive(path)
+        
+        # Check SWHIDs
+        all_swhids = [c.swhid for c in dir_candidates] + [c.swhid for c in file_candidates]
+        
+        if all_swhids:
+            known_swhids = await self.swh_client.check_swhids_known(all_swhids[:100])
+            
+            for swhid, is_known in known_swhids.items():
+                if is_known:
+                    # Try to get origin information
+                    origin = await self.swh_client.get_origin_for_swhid(swhid)
+                    if origin:
+                        candidates.append({
+                            "source": "swh",
+                            "swhid": swhid,
+                            "origin": origin,
+                            "confidence": 1.0
+                        })
+        
+        return candidates
+    
+    async def _identify_via_hash_search(
+        self,
+        path: Path,
+        max_depth: int
+    ) -> List[Dict[str, Any]]:
+        """Identify using hash-based web search."""
+        candidates = []
+        
+        # Scan for hashes
+        from ..core.config import SWHPIConfig
+        from ..core.swhid import SWHIDGenerator
+        config = SWHPIConfig(verbose=self.verbose, max_depth=1)
+        scanner = DirectoryScanner(config, SWHIDGenerator())
+        dir_candidates, _ = scanner.scan_recursive(path)
+        
+        if dir_candidates:
+            # Extract hash from SWHID
+            swhid = dir_candidates[0].swhid
+            hash_value = swhid.split(":")[-1] if ":" in swhid else swhid
+            
+            # Search for hash
+            urls = await self.hash_searcher.search_hash(hash_value)
+            
+            for url in urls:
+                candidates.append({
+                    "source": "hash_search",
+                    "hash": hash_value,
+                    "origin": url,
+                    "confidence": 0.8
+                })
+        
+        return candidates
+    
+    async def _identify_via_scanoss(
+        self,
+        path: Path,
+        max_depth: int
+    ) -> List[Dict[str, Any]]:
+        """Identify using SCANOSS fingerprinting."""
+        candidates = []
+        
+        # Initialize SCANOSS provider
+        scanoss = SCANOSSProvider(verbose=self.verbose)
+        
+        try:
+            await scanoss.ensure_session()
+            
+            # Scan directory
+            results = await scanoss.scan_directory(path, max_files=5)
+            
+            # Extract repositories
+            repos = []
+            for file_result in results.values():
+                for match in file_result.get("matches", []):
+                    if "repository" in match:
+                        repos.append(match["repository"])
+                        candidates.append({
+                            "source": "scanoss",
+                            "component": match.get("component", ""),
+                            "origin": match["repository"],
+                            "confidence": match.get("matched_percent", 0) / 100.0
+                        })
+            
+        finally:
+            await scanoss.close()
+        
+        return candidates
+    
+    async def _identify_via_web_search(
+        self,
+        path: Path,
+        max_depth: int
+    ) -> List[Dict[str, Any]]:
+        """Identify using web search providers."""
+        candidates = []
+        
+        # Get project name from path
+        project_name = path.name
+        
+        # Search using all available providers
+        search_results = await self.search_registry.search_all(
+            f'"{project_name}" repository site:github.com OR site:gitlab.com'
+        )
+        
+        for provider, urls in search_results.items():
+            for url in urls:
+                candidates.append({
+                    "source": f"web_search_{provider}",
+                    "query": project_name,
+                    "origin": url,
+                    "confidence": 0.6
+                })
+        
+        return candidates
+    
+    def print_results(self, results: Dict[str, Any]):
+        """Print identification results in a formatted table."""
+        table = Table(title="Source Identification Results")
+        table.add_column("Property", style="cyan")
+        table.add_column("Value", style="white")
+        
+        table.add_row("Path", results["path"])
+        table.add_row("Identified", "✅ Yes" if results["identified"] else "❌ No")
+        table.add_row("Confidence", f"{results['confidence']:.1%}")
+        table.add_row("Strategies Used", ", ".join(results["strategies_used"]))
+        
+        if results["final_origin"]:
+            table.add_row("Repository", results["final_origin"])
+        
+        console.print(table)
+        
+        if results["candidates"] and self.verbose:
+            console.print("\n[bold]Top Candidates:[/bold]")
+            for i, candidate in enumerate(results["candidates"][:5], 1):
+                console.print(f"{i}. {candidate.get('origin', 'Unknown')} "
+                            f"(via {candidate.get('source', 'unknown')}, "
+                            f"confidence: {candidate.get('confidence', 0):.1%})")
+
+
+async def identify_source(
+    path: Path,
+    max_depth: int = 3,
+    confidence_threshold: float = 0.5,
+    verbose: bool = False,
+    strategies: Optional[List[str]] = None
+) -> Dict[str, Any]:
+    """Convenience function for source identification.
+    
+    Args:
+        path: Path to analyze
+        max_depth: Maximum depth for recursive scanning
+        confidence_threshold: Minimum confidence for identification
+        verbose: Enable verbose output
+        strategies: List of strategies to use
+        
+    Returns:
+        Identification results
+    """
+    identifier = SourceIdentifier(verbose=verbose)
+    results = await identifier.identify(
+        path=path,
+        max_depth=max_depth,
+        confidence_threshold=confidence_threshold,
+        strategies=strategies
+    )
+    
+    if verbose:
+        identifier.print_results(results)
+    
+    return results

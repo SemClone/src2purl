@@ -8,6 +8,13 @@ from typing import Any, Dict, List, Optional
 import aiohttp
 from aiohttp import ClientError, ClientTimeout
 
+try:
+    from swh.web.client.client import WebAPIClient
+    SWH_CLIENT_AVAILABLE = True
+except ImportError:
+    SWH_CLIENT_AVAILABLE = False
+    WebAPIClient = None
+
 from swhpi.core.cache import PersistentCache
 from swhpi.core.config import SWHPIConfig
 from swhpi.core.models import MatchType, SHAPIResponse, SHOriginMatch
@@ -26,6 +33,25 @@ class SoftwareHeritageClient:
         """
         self.config = config
         self.session: Optional[aiohttp.ClientSession] = None
+        
+        # Use official WebAPIClient if available, fallback to custom implementation
+        if SWH_CLIENT_AVAILABLE:
+            # Configure official client with authentication if available
+            client_kwargs = {"api_url": config.sh_api_base}
+            if config.api_token:
+                client_kwargs["bearer_token"] = config.api_token
+                if config.verbose:
+                    print("Using API authentication token")
+            self.web_client = WebAPIClient(**client_kwargs)
+            self._use_official_client = True
+            if config.verbose:
+                print("Using official Software Heritage WebAPIClient")
+        else:
+            self.web_client = None
+            self._use_official_client = False
+            if config.verbose:
+                print("Using fallback HTTP client (install swh.web for better performance)")
+        
         # Use persistent cache if enabled
         if config.cache_enabled:
             self.cache = PersistentCache()
@@ -51,7 +77,10 @@ class SoftwareHeritageClient:
         """Start the aiohttp session."""
         if self.session is None:
             timeout = ClientTimeout(total=30)
-            self.session = aiohttp.ClientSession(timeout=timeout)
+            headers = {}
+            if self.config.api_token:
+                headers["Authorization"] = f"Bearer {self.config.api_token}"
+            self.session = aiohttp.ClientSession(timeout=timeout, headers=headers)
     
     async def close_session(self):
         """Close the aiohttp session."""
@@ -77,6 +106,47 @@ class SoftwareHeritageClient:
         
         return response.data if isinstance(response.data, list) else [response.data]
     
+    async def check_swhids_known(self, swhids: List[str]) -> Dict[str, bool]:
+        """
+        Check which SWHIDs are known in the Software Heritage archive using batch API.
+        
+        Args:
+            swhids: List of Software Heritage Identifiers
+            
+        Returns:
+            Dictionary mapping SWHID to known status
+        """
+        if not swhids:
+            return {}
+        
+        # Use official client if available
+        if self._use_official_client and self.web_client:
+            try:
+                # Use the official known() method for batch checking
+                result = self.web_client.known(swhids)
+                return {swhid: data.get('known', False) for swhid, data in result.items()}
+            except Exception as e:
+                if self.config.verbose:
+                    print(f"Official client failed, falling back: {e}")
+                # Fall through to custom implementation
+        
+        # Ensure session is started for fallback requests
+        if not self.session:
+            await self.start_session()
+        
+        # Fallback to individual requests
+        results = {}
+        if self.config.verbose:
+            print(f"Using fallback individual requests for {len(swhids)} SWHIDs")
+        
+        for i, swhid in enumerate(swhids):
+            if self.config.verbose and len(swhids) > 5:
+                print(f"Checking SWHID {i+1}/{len(swhids)}: {swhid[:20]}...")
+            dir_info = await self._get_directory_info(swhid)
+            results[swhid] = dir_info is not None
+        
+        return results
+    
     async def get_directory_origins(self, swhid: str) -> List[SHOriginMatch]:
         """
         Get all origins containing this directory.
@@ -87,14 +157,12 @@ class SoftwareHeritageClient:
         Returns:
             List of origin matches
         """
-        # First, verify the directory exists
-        dir_info = await self._get_directory_info(swhid)
-        if not dir_info:
+        # First, check if directory is known using batch API
+        known_status = await self.check_swhids_known([swhid])
+        if not known_status.get(swhid, False):
             return []
         
         # Then get origins that contain this directory
-        # Note: The actual SH API endpoint for this might be different
-        # This is a simplified version for demonstration
         origins_data = await self._get_directory_origins_data(swhid)
         
         # Convert to our model

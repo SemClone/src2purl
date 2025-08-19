@@ -27,6 +27,7 @@ class SWHPIConfig:
     
     # API configuration
     sh_api_base: str = "https://archive.softwareheritage.org/api/1"
+    api_token: str = ""  # Optional API token for authentication (bypasses rate limits)
     rate_limit_delay: float = 0.5  # Seconds between API calls
     request_timeout: float = 30.0  # Timeout for API requests in seconds
     max_retries: int = 3
@@ -37,5 +38,5 @@ class SWHPIConfig:
     verbose: bool = False
     
     # Feature flags
-    enable_fuzzy_matching: bool = True
+    enable_fuzzy_matching: bool = False
     enable_batch_processing: bool = False

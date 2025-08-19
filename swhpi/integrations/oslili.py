@@ -4,12 +4,11 @@ This module provides integration with the oslili (Open Source License
 Identification Library) tool for more accurate license detection in packages.
 """
 
-import subprocess
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Set
 
 try:
-    import oslili
+    from semantic_copycat_oslili import LegalAttributionGenerator
     HAS_OSLILI = True
 except ImportError:
     HAS_OSLILI = False
@@ -20,32 +19,15 @@ class OsliliIntegration:
     
     def __init__(self):
         """Initialize oslili integration."""
-        self.available = self._check_availability()
-        if self.available and HAS_OSLILI:
+        self.available = HAS_OSLILI
+        if self.available:
             try:
-                # Initialize oslili if available
-                self.detector = oslili.LicenseDetector()
+                self.generator = LegalAttributionGenerator()
             except Exception:
-                self.detector = None
+                self.generator = None
+                self.available = False
         else:
-            self.detector = None
-    
-    def _check_availability(self) -> bool:
-        """Check if oslili is available."""
-        if HAS_OSLILI:
-            return True
-        
-        # Check if oslili CLI is available
-        try:
-            result = subprocess.run(
-                ["oslili", "--version"],
-                capture_output=True,
-                text=True,
-                timeout=5
-            )
-            return result.returncode == 0
-        except (subprocess.SubprocessError, FileNotFoundError):
-            return False
+            self.generator = None
     
     def detect_licenses(self, path: Path) -> Dict[str, Any]:
         """
@@ -61,7 +43,7 @@ class OsliliIntegration:
             - files: Dict mapping files to their licenses
             - summary: Human-readable summary
         """
-        if not self.available:
+        if not self.available or not self.generator:
             return {
                 "licenses": [],
                 "confidence": 0.0,
@@ -70,48 +52,46 @@ class OsliliIntegration:
                 "error": "oslili integration not available"
             }
         
-        # Use Python API if available
-        if self.detector:
-            return self._detect_with_api(path)
-        else:
-            # Fall back to CLI
-            return self._detect_with_cli(path)
-    
-    def _detect_with_api(self, path: Path) -> Dict[str, Any]:
-        """Detect licenses using oslili Python API."""
         try:
-            # Scan the path
-            results = self.detector.scan(str(path))
+            # Process the path using oslili
+            result = self.generator.process_local_path(str(path))
             
-            # Process results
-            licenses = set()
-            file_licenses = {}
-            confidence_scores = []
-            
-            for file_path, file_result in results.items():
-                if file_result.licenses:
-                    file_licenses[file_path] = file_result.licenses
-                    licenses.update(file_result.licenses)
-                    if file_result.confidence:
-                        confidence_scores.append(file_result.confidence)
-            
-            # Calculate average confidence
-            avg_confidence = sum(confidence_scores) / len(confidence_scores) if confidence_scores else 0.0
-            
-            # Generate summary
-            license_list = sorted(licenses)
-            if license_list:
-                summary = f"Found {len(license_list)} license(s): {', '.join(license_list)}"
+            if result and result.licenses:
+                # Extract license information
+                licenses = []
+                confidence_scores = []
+                
+                for license_info in result.licenses:
+                    if hasattr(license_info, 'spdx_id'):
+                        licenses.append(license_info.spdx_id)
+                        if hasattr(license_info, 'confidence'):
+                            confidence_scores.append(license_info.confidence)
+                
+                # Calculate average confidence
+                avg_confidence = sum(confidence_scores) / len(confidence_scores) if confidence_scores else 0.8
+                
+                # Generate summary
+                if licenses:
+                    summary = f"Found {len(licenses)} license(s): {', '.join(licenses[:3])}"
+                    if len(licenses) > 3:
+                        summary += f" and {len(licenses) - 3} more"
+                else:
+                    summary = "No licenses detected"
+                
+                return {
+                    "licenses": licenses,
+                    "confidence": avg_confidence,
+                    "files": {},
+                    "summary": summary
+                }
             else:
-                summary = "No licenses detected"
-            
-            return {
-                "licenses": license_list,
-                "confidence": avg_confidence,
-                "files": file_licenses,
-                "summary": summary
-            }
-            
+                return {
+                    "licenses": [],
+                    "confidence": 0.0,
+                    "files": {},
+                    "summary": "No licenses detected"
+                }
+                
         except Exception as e:
             return {
                 "licenses": [],
@@ -121,57 +101,7 @@ class OsliliIntegration:
                 "error": str(e)
             }
     
-    def _detect_with_cli(self, path: Path) -> Dict[str, Any]:
-        """Detect licenses using oslili CLI."""
-        try:
-            # Run oslili CLI
-            result = subprocess.run(
-                ["oslili", "scan", str(path), "--json"],
-                capture_output=True,
-                text=True,
-                timeout=30
-            )
-            
-            if result.returncode != 0:
-                return {
-                    "licenses": [],
-                    "confidence": 0.0,
-                    "files": {},
-                    "summary": f"oslili CLI error: {result.stderr}",
-                    "error": result.stderr
-                }
-            
-            # Parse JSON output
-            import json
-            data = json.loads(result.stdout)
-            
-            # Extract licenses
-            licenses = data.get("licenses", [])
-            confidence = data.get("confidence", 0.0)
-            
-            return {
-                "licenses": licenses,
-                "confidence": confidence,
-                "files": data.get("files", {}),
-                "summary": data.get("summary", "Processed with oslili CLI")
-            }
-            
-        except subprocess.TimeoutExpired:
-            return {
-                "licenses": [],
-                "confidence": 0.0,
-                "files": {},
-                "summary": "oslili scan timeout",
-                "error": "Scan timeout exceeded"
-            }
-        except Exception as e:
-            return {
-                "licenses": [],
-                "confidence": 0.0,
-                "files": {},
-                "summary": f"Error running oslili CLI: {e}",
-                "error": str(e)
-            }
+    
     
     def enhance_package_match(self, match: "PackageMatch", path: Path) -> "PackageMatch":
         """

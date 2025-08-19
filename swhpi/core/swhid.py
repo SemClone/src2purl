@@ -10,9 +10,8 @@ HAS_SWH_MODEL = False
 HAS_MINISWHID = False
 
 try:
-    from swh.model.cli import identify
-    from swh.model.hashutil import hash_to_hex
-    from swh.model.from_disk import Directory
+    from swh.model.cli import model_of_dir
+    from swh.model.from_disk import Content
     HAS_SWH_MODEL = True
 except ImportError:
     try:
@@ -111,16 +110,22 @@ class SWHIDGenerator:
             SWHID string
         """
         try:
-            from swh.model.from_disk import Directory as SWHDirectory
-            from swh.model.swhids import ObjectType
+            # Use official exclusion patterns like SWH scanner
+            exclusion_patterns = [
+                b'.git', b'.hg', b'.svn', b'__pycache__', 
+                b'.mypy_cache', b'.tox', b'*.egg-info',
+                b'.bzr', b'.coverage', b'.eggs'
+            ]
             
-            # Create a Directory object from the path
-            directory = SWHDirectory.from_disk(path=bytes(path), max_content_length=10**9)
+            # Use official model_of_dir method (same as SWH scanner)
+            source_tree = model_of_dir(
+                str(path).encode(),
+                exclusion_patterns
+            )
             
-            # Get the hash
-            dir_hash = directory.hash.hex() if hasattr(directory.hash, 'hex') else str(directory.hash)
-            
-            return f"swh:1:dir:{dir_hash}"
+            # Generate SWHID using official method
+            swhid = source_tree.swhid()
+            return str(swhid)
             
         except Exception as e:
             print(f"Warning: swh.model failed for {path}: {e}")
@@ -231,6 +236,31 @@ class SWHIDGenerator:
         # Return in SWHID format
         # Note: This is a simplified format and may not match SH exactly
         return f"swh:1:dir:{dir_hash}"
+    
+    def generate_content_swhid(self, file_path: Path) -> str:
+        """
+        Generate SWHID for file content.
+        
+        Args:
+            file_path: File path
+            
+        Returns:
+            SWHID string for the file content
+        """
+        if not file_path.is_file():
+            raise ValueError(f"Not a file: {file_path}")
+        
+        if self.use_swh_model:
+            try:
+                # Use official SWH model for accurate content hashing
+                content = Content.from_file(path=file_path, max_content_length=10_000_000)
+                return str(content.swhid())
+            except Exception:
+                # Fall back to basic implementation
+                pass
+        
+        # Fallback: Generate git-compatible SHA1
+        return self._hash_file_content(file_path)
     
     def _hash_file_content(self, file_path: Path) -> str:
         """

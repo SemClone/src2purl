@@ -2,6 +2,7 @@
 
 import asyncio
 import json
+import os
 import sys
 from pathlib import Path
 from typing import Optional
@@ -40,9 +41,9 @@ console = Console()
     help="Output format",
 )
 @click.option(
-    "--no-fuzzy",
+    "--enable-fuzzy",
     is_flag=True,
-    help="Disable fuzzy matching for faster execution",
+    help="Enable fuzzy matching (keyword search) when exact matches fail",
 )
 @click.option(
     "--no-cache",
@@ -55,9 +56,14 @@ console = Console()
     help="Clear all cached API responses and exit",
 )
 @click.option(
-    "--enhance-licenses",
+    "--no-license-detection",
     is_flag=True,
-    help="Use oslili for enhanced license detection (if available)",
+    help="Skip automatic license detection from local source code",
+)
+@click.option(
+    "--api-token",
+    envvar="SWH_API_TOKEN",
+    help="Software Heritage API token for authentication (can also be set via SWH_API_TOKEN env var)",
 )
 @click.option(
     "--verbose",
@@ -71,10 +77,11 @@ def main(
     max_depth: int,
     confidence_threshold: float,
     output_format: str,
-    no_fuzzy: bool,
+    enable_fuzzy: bool,
     no_cache: bool,
     clear_cache: bool,
-    enhance_licenses: bool,
+    no_license_detection: bool,
+    api_token: Optional[str],
     verbose: bool,
 ) -> None:
     """
@@ -102,35 +109,40 @@ def main(
         max_depth=max_depth,
         report_match_threshold=confidence_threshold,
         cache_enabled=not no_cache,
-        enable_fuzzy_matching=not no_fuzzy,
+        enable_fuzzy_matching=enable_fuzzy,
         output_format=output_format,
+        api_token=api_token or "",
         verbose=verbose,
     )
     
-    if verbose:
-        console.print(f"[dim]SWHPI v{__version__}[/dim]")
-        console.print(f"[dim]Analyzing: {path}[/dim]")
-        console.print(f"[dim]Max depth: {max_depth}[/dim]")
-        console.print(f"[dim]Confidence threshold: {confidence_threshold}[/dim]")
-        
-        # Show cache status
-        if not no_cache:
-            from swhpi.core.cache import PersistentCache
-            cache = PersistentCache()
-            stats = cache.get_cache_stats()
-            console.print(f"[dim]Cache: {stats['entries']} entries ({stats['total_size_mb']} MB)[/dim]")
-        console.print()
+    # Always show analysis header (not just in verbose mode)
+    console.print(f"[dim]SWHPI v{__version__}[/dim]")
+    console.print(f"[dim]Analyzing: {path}[/dim]")
+    console.print(f"[dim]Max depth: {max_depth}[/dim]")
+    console.print(f"[dim]Confidence threshold: {confidence_threshold}[/dim]")
+    
+    # Show authentication status
+    if api_token:
+        console.print(f"[dim]API auth: [green]✓ Using API token[/green][/dim]")
+    
+    # Show cache status
+    if not no_cache:
+        from swhpi.core.cache import PersistentCache
+        cache = PersistentCache()
+        stats = cache.get_cache_stats()
+        console.print(f"[dim]Cache: {stats['entries']} entries ({stats['total_size_mb']} MB)[/dim]")
+    console.print()
     
     try:
         # Run the identifier
         identifier = SHPackageIdentifier(config)
-        matches = asyncio.run(identifier.identify_packages(path, enhance_licenses=enhance_licenses))
+        matches = asyncio.run(identifier.identify_packages(path, enhance_licenses=not no_license_detection))
         
         # Output results
         if output_format == "json":
             output_json(matches, config)
         else:
-            output_table(matches, config)
+            output_table(matches, config, path)
             
     except KeyboardInterrupt:
         console.print("\n[yellow]Interrupted by user[/yellow]")
@@ -165,8 +177,42 @@ def output_json(matches: list[PackageMatch], config: SWHPIConfig) -> None:
     print(json.dumps(output, indent=2, default=str))
 
 
-def output_table(matches: list[PackageMatch], config: SWHPIConfig) -> None:
+def show_local_source_analysis(path: Path, config: SWHPIConfig) -> None:
+    """Show analysis of local source code."""
+    console.print("[bold]Local Source Analysis[/bold]")
+    
+    # Detect licenses in local source code
+    try:
+        from swhpi.integrations.oslili import OsliliIntegration
+        integration = OsliliIntegration()
+        
+        if integration.available:
+            license_info = integration.detect_licenses(path)
+            
+            if license_info["licenses"]:
+                license_list = ", ".join(license_info["licenses"][:3])
+                if len(license_info["licenses"]) > 3:
+                    license_list += f" and {len(license_info['licenses']) - 3} more"
+                console.print(f"[green]✓[/green] Licenses detected: [yellow]{license_list}[/yellow]")
+                console.print(f"[dim]  Confidence: {license_info['confidence']:.1%}[/dim]")
+            else:
+                console.print("[yellow]⚠[/yellow] No licenses detected in source code")
+        else:
+            console.print("[dim]• License detection unavailable[/dim]")
+    except ImportError:
+        console.print("[dim]• License detection unavailable[/dim]")
+    
+    # Show directory scan info
+    console.print(f"[dim]• Scanned {path} and subdirectories[/dim]")
+    console.print()
+
+
+def output_table(matches: list[PackageMatch], config: SWHPIConfig, path: Path) -> None:
     """Output results as a formatted table."""
+    
+    # Show local source analysis
+    show_local_source_analysis(path, config)
+    
     if not matches:
         console.print("[yellow]No package matches found.[/yellow]")
         return
@@ -175,40 +221,46 @@ def output_table(matches: list[PackageMatch], config: SWHPIConfig) -> None:
         # Use rich table for verbose output
         table = Table(title="Package Matches")
         table.add_column("Name", style="cyan", no_wrap=True)
-        table.add_column("Version", style="magenta")
         table.add_column("Confidence", justify="right", style="green")
-        table.add_column("License", style="yellow")
+        table.add_column("Method", style="yellow")
         table.add_column("PURL", style="blue")
-        table.add_column("Type", style="dim")
+        table.add_column("Source", style="dim")
+        table.add_column("URL", style="dim")
         
         for match in matches:
             table.add_row(
                 match.name or "Unknown",
-                match.version or "Unknown",
                 f"{match.confidence_score:.2f}",
-                match.license or "Unknown",
-                match.purl or "N/A",
                 match.match_type.value,
+                match.purl or "N/A",
+                "Repository",
+                match.download_url,
             )
         
         console.print(table)
     else:
-        # Use tabulate for standard output
-        headers = ["Name", "Version", "Confidence", "License", "PURL"]
-        rows = []
-        for match in matches:
-            rows.append([
-                match.name or "Unknown",
-                match.version or "Unknown",
-                f"{match.confidence_score:.2f}",
-                match.license or "Unknown",
-                match.purl or "N/A",
-            ])
+        # Use rich table for clean standard output (better than tabulate)
+        table = Table(show_header=True, header_style="bold magenta")
+        table.add_column("Name", style="cyan", no_wrap=True)
+        table.add_column("Confidence", justify="right", style="green") 
+        table.add_column("Method", style="yellow")
+        table.add_column("PURL", style="blue", max_width=50)
         
-        print(tabulate(rows, headers=headers, tablefmt="grid"))
+        for match in matches:
+            table.add_row(
+                match.name or "Unknown",
+                f"{match.confidence_score:.2f}",
+                match.match_type.value, 
+                match.purl or "N/A",
+            )
+        
+        console.print(table)
     
+    # Show result summary for both modes  
     if config.verbose:
-        console.print(f"\n[dim]Found {len(matches)} matches[/dim]")
+        console.print(f"\n[green]Found {len(matches)} matches[/green]")
+    else:
+        console.print(f"\n✓ Found [green]{len(matches)}[/green] package matches")
 
 
 if __name__ == "__main__":

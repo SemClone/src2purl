@@ -2,10 +2,10 @@
 
 import os
 from pathlib import Path
-from typing import List, Optional, Set
+from typing import List, Optional, Set, Tuple
 
 from swhpi.core.config import SWHPIConfig
-from swhpi.core.models import DirectoryCandidate
+from swhpi.core.models import DirectoryCandidate, ContentCandidate
 
 
 class DirectoryScanner:
@@ -55,69 +55,126 @@ class DirectoryScanner:
         self.config = config
         self.swhid_generator = swhid_generator
     
-    def scan_recursive(self, start_path: Path) -> List[DirectoryCandidate]:
+    def scan_recursive(self, start_path: Path) -> Tuple[List[DirectoryCandidate], List[ContentCandidate]]:
         """
-        Generate directory candidates using parent-first approach.
+        Generate directory and file candidates using depth-first approach.
         
-        This optimizes for finding matches at the package root level first,
-        avoiding unnecessary scanning of subdirectories.
+        Scans the starting directory and files first, then subdirectories up to max_depth.
         
         Args:
             start_path: Starting directory path
             
         Returns:
-            List of directory candidates ordered by specificity
+            Tuple of (directory candidates, file candidates)
         """
-        candidates = []
+        dir_candidates = []
+        file_candidates = []
         current = start_path.resolve()
         
-        # Build parent chain starting from the target directory
-        parent_chain = []
-        temp = current
-        for depth in range(self.config.max_depth + 1):
-            parent_chain.append((temp, depth))
-            if temp.parent == temp:  # Reached filesystem root
-                break
-            temp = temp.parent
+        # Track total files scanned (for limiting)
+        max_files = 100  # Reasonable limit to avoid overwhelming the API
+        files_scanned = 0
         
-        # Process from target directory first, then parents
-        for path, depth in parent_chain:
-            if not self._is_meaningful_directory(path):
-                continue
+        # Scan subdirectories recursively
+        def scan_directory(path: Path, depth: int):
+            nonlocal files_scanned
             
-            try:
-                # Generate SWHID for the directory
-                swhid = self.swhid_generator.generate_directory_swhid(path)
+            if depth > self.config.max_depth:
+                return
                 
-                # Count relevant files
-                file_count = self._count_relevant_files(path)
-                
-                # Calculate specificity score (higher for more specific directories)
-                specificity_score = self._calculate_specificity_score(
-                    path, start_path, depth, file_count
-                )
-                
-                candidate = DirectoryCandidate(
-                    path=path,
-                    swhid=swhid,
-                    depth=depth,
-                    specificity_score=specificity_score,
-                    file_count=file_count
-                )
-                candidates.append(candidate)
-                
-                if self.config.verbose:
-                    print(f"Scanned: {path.name} (depth={depth}, files={file_count})")
-                
-            except Exception as e:
-                if self.config.verbose:
-                    print(f"Error scanning {path}: {e}")
-                continue
+            # Process current directory
+            if self._is_meaningful_directory(path):
+                self._add_candidate(dir_candidates, path, depth, current)
+            
+            # Process files in current directory (only at depths we're scanning)
+            if files_scanned < max_files:
+                try:
+                    for item in path.iterdir():
+                        if item.is_file() and not item.name.startswith('.'):
+                            # Skip very large files and common non-source files
+                            if item.suffix not in {'.pyc', '.pyo', '.so', '.dll', '.exe', '.jpg', '.png', '.gif'}:
+                                if item.stat().st_size < 10_000_000:  # Skip files > 10MB
+                                    self._add_file_candidate(file_candidates, item, depth, current)
+                                    files_scanned += 1
+                                    if files_scanned >= max_files:
+                                        break
+                except (PermissionError, OSError):
+                    pass
+            
+            # Scan subdirectories
+            if depth < self.config.max_depth:
+                try:
+                    for subdir in path.iterdir():
+                        if (subdir.is_dir() and 
+                            subdir.name not in self.SKIP_DIRS and 
+                            not subdir.name.startswith('.')):
+                            scan_directory(subdir, depth + 1)
+                except (PermissionError, OSError):
+                    if self.config.verbose:
+                        print(f"Permission denied scanning: {path}")
         
-        # Sort by specificity score (highest first)
-        candidates.sort(key=lambda c: c.specificity_score, reverse=True)
+        # Start scanning from the target directory
+        scan_directory(current, 0)
         
-        return candidates
+        # Sort directory candidates by specificity score (highest first)
+        dir_candidates.sort(key=lambda c: c.specificity_score, reverse=True)
+        
+        if self.config.verbose and file_candidates:
+            print(f"Collected {len(file_candidates)} files for checking")
+        
+        return dir_candidates, file_candidates
+    
+    def _add_candidate(self, candidates: List[DirectoryCandidate], path: Path, depth: int, start_path: Path):
+        """Add a directory candidate to the list."""
+        try:
+            # Generate SWHID for the directory
+            swhid = self.swhid_generator.generate_directory_swhid(path)
+            
+            # Count relevant files
+            file_count = self._count_relevant_files(path)
+            
+            # Calculate specificity score (higher for more specific directories)
+            specificity_score = self._calculate_specificity_score(
+                path, start_path, depth, file_count
+            )
+            
+            candidate = DirectoryCandidate(
+                path=path,
+                swhid=swhid,
+                depth=depth,
+                specificity_score=specificity_score,
+                file_count=file_count
+            )
+            candidates.append(candidate)
+            
+            if self.config.verbose:
+                print(f"Scanned: {path.relative_to(start_path.parent) if path != start_path else path.name} (depth={depth}, files={file_count})")
+                print(f"  SWHID: {swhid}")
+                
+        except Exception as e:
+            if self.config.verbose:
+                print(f"Error scanning {path}: {e}")
+    
+    def _add_file_candidate(self, candidates: List[ContentCandidate], file_path: Path, depth: int, start_path: Path):
+        """Add a file candidate to the list."""
+        try:
+            # Generate SWHID for the file
+            swhid = self.swhid_generator.generate_content_swhid(file_path)
+            
+            # Get file size
+            size = file_path.stat().st_size
+            
+            candidate = ContentCandidate(
+                path=file_path,
+                swhid=swhid,
+                depth=depth,
+                size=size
+            )
+            candidates.append(candidate)
+                
+        except Exception as e:
+            if self.config.verbose:
+                print(f"Error scanning file {file_path}: {e}")
     
     def _is_meaningful_directory(self, path: Path) -> bool:
         """

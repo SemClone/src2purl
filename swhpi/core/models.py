@@ -56,6 +56,16 @@ class DirectoryCandidate:
 
 
 @dataclass
+class ContentCandidate:
+    """Represents a file/content candidate for SWHID matching."""
+    
+    path: Path
+    swhid: str
+    depth: int
+    size: int
+
+
+@dataclass
 class SHOriginMatch:
     """Represents an origin match from Software Heritage."""
     

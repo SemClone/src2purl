@@ -49,11 +49,18 @@ swhpi /path/to/source --confidence-threshold 0.85
 # JSON output format
 swhpi /path/to/source --output-format json
 
-# Disable fuzzy matching for speed
-swhpi /path/to/source --no-fuzzy
+# Enable fuzzy matching (keyword search)
+swhpi /path/to/source --enable-fuzzy
 
-# Enable enhanced license detection with oslili
-swhpi /path/to/source --enhance-licenses
+# Skip license detection
+swhpi /path/to/source --no-license-detection
+
+# Use API token for authentication (bypasses rate limits)
+swhpi /path/to/source --api-token YOUR_TOKEN
+
+# Or set via environment variable
+export SWH_API_TOKEN=YOUR_TOKEN
+swhpi /path/to/source
 
 # Clear cache and exit
 swhpi --clear-cache
@@ -61,6 +68,21 @@ swhpi --clear-cache
 # Verbose output for debugging
 swhpi /path/to/source --verbose
 ```
+
+### API Authentication
+
+To bypass rate limits and get better performance, you can use a Software Heritage API token:
+
+1. **Get an API token**: Register at https://archive.softwareheritage.org/api/ and generate a token
+2. **Use the token**: 
+   - Via command line: `--api-token YOUR_TOKEN`
+   - Via environment variable: `export SWH_API_TOKEN=YOUR_TOKEN`
+
+Benefits of using API authentication:
+- No rate limiting
+- Faster API responses
+- Higher request quotas
+- Access to additional API endpoints
 
 ### SWHID Validation
 
@@ -81,10 +103,11 @@ python -m swhpi.cli.validate /path/to/directory --use-fallback --verbose
 - `--max-depth`: Maximum parent directory levels to scan (default: 2)
 - `--confidence-threshold`: Minimum confidence to report matches (default: 0.3)
 - `--output-format`: Output format: 'json' or 'table' (default: table)
-- `--no-fuzzy`: Disable fuzzy matching for faster execution
+- `--enable-fuzzy`: Enable fuzzy matching (keyword search) when exact matches fail
 - `--no-cache`: Disable API response caching
 - `--clear-cache`: Clear all cached API responses and exit
-- `--enhance-licenses`: Use oslili for enhanced license detection (if available)
+- `--no-license-detection`: Skip automatic license detection from local source
+- `--api-token`: Software Heritage API token for authentication
 - `--verbose`: Verbose output for debugging
 
 ## License
