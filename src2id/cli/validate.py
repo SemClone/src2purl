@@ -18,7 +18,7 @@ from src2id.core.swhid import SWHIDGenerator
 @click.option(
     "--use-fallback",
     is_flag=True,
-    help="Use fallback implementation instead of miniswhid (deprecated)",
+    help="Use fallback implementation instead of swh.model",
 )
 @click.option(
     "-v", "--verbose",
@@ -36,8 +36,7 @@ def validate_swhid(
     This tool generates a SWHID for the given PATH and optionally
     compares it against an expected value.
     """
-    # use_fallback is deprecated since we now only use miniswhid
-    generator = SWHIDGenerator()
+    generator = SWHIDGenerator(use_swh_model=not use_fallback)
     
     # Determine if path is file or directory
     if path.is_file():

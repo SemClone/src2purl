@@ -6,7 +6,7 @@ A Python tool that identifies package coordinates (name, version, license, PURL)
 
 src2id helps you identify packages in unknown code by:
 1. Using multiple identification strategies (hash search, web search, SCANOSS)
-2. Generating Software Heritage Identifiers (SWHIDs) using miniswhid
+2. Generating Software Heritage Identifiers (SWHIDs) for content hashing
 3. Searching across GitHub, Google, and other sources for matching code
 4. SCANOSS fingerprinting for code similarity detection
 5. Providing confidence scores and Package URLs (PURLs) for identified packages
@@ -37,6 +37,15 @@ cd semantic-copycat-src2id
 pip install -e .
 ```
 
+### Recommended: Install SWHID Generation Library
+
+For accurate Software Heritage Identifier (SWHID) generation, install miniswhid:
+
+```bash
+pip install miniswhid
+```
+
+Note: The tool will fall back to swh.model if available, or use a custom implementation if neither is installed.
 
 
 ## Usage
