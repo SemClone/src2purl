@@ -5,7 +5,7 @@ import tempfile
 import os
 from pathlib import Path
 
-from swhpi.core.swhid import SWHIDGenerator
+from src2id.core.swhid import SWHIDGenerator
 
 
 class TestSWHIDGenerator:

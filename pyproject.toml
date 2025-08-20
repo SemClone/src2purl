@@ -3,9 +3,9 @@ requires = ["setuptools>=61.0", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "semantic-copycat-swhpi"
+name = "semantic-copycat-src2id"
 version = "1.1.2"
-description = "Software Heritage Package Identifier - Identify package coordinates from source code using Software Heritage"
+description = "Source to ID - Identify package coordinates and repositories from source code using multiple strategies"
 readme = "README.md"
 requires-python = ">=3.9"
 license = {text = "AGPL-3.0"}
@@ -60,12 +60,12 @@ enhanced = [
 
 
 [project.scripts]
-swhpi = "swhpi.cli.main:main"
-swhpi-validate = "swhpi.cli.validate:validate_swhid"
+src2id = "src2id.cli.main:main"
+src2id-validate = "src2id.cli.validate:validate_swhid"
 
 [tool.setuptools.packages.find]
 where = ["."]
-include = ["swhpi*"]
+include = ["src2id*"]
 
 [tool.black]
 line-length = 100
@@ -91,11 +91,11 @@ warn_unused_ignores = true
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 python_files = ["test_*.py"]
-addopts = "-v --cov=swhpi --cov-report=term-missing"
+addopts = "-v --cov=src2id --cov-report=term-missing"
 asyncio_mode = "auto"
 
 [tool.coverage.run]
-source = ["swhpi"]
+source = ["src2id"]
 omit = ["tests/*", "*/migrations/*", "*/__init__.py"]
 
 [tool.coverage.report]

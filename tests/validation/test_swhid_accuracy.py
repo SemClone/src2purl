@@ -11,7 +11,7 @@ from typing import Dict, List, Tuple
 
 import pytest
 
-from swhpi.core.swhid import SWHIDGenerator
+from src2id.core.swhid import SWHIDGenerator
 
 
 # Known test cases with verified SWHIDs from Software Heritage

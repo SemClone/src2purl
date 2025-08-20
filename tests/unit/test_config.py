@@ -1,7 +1,7 @@
 """Tests for configuration management."""
 
 import pytest
-from swhpi.core.config import SWHPIConfig
+from src2id.core.config import SWHPIConfig
 
 
 def test_default_config():

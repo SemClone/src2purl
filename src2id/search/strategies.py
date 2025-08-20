@@ -38,14 +38,12 @@ class SourceIdentifier:
             search_registry: Registry of search providers
             verbose: Enable verbose output
         """
-        if swh_client is None:
-            from ..core.config import SWHPIConfig
-            config = SWHPIConfig(verbose=verbose)
-            swh_client = SoftwareHeritageClient(config)
+        # Only store the client if provided, don't create it automatically
         self.swh_client = swh_client
         self.search_registry = search_registry or create_default_registry(verbose=verbose)
         self.verbose = verbose
         self.hash_searcher = HashSearcher(verbose=verbose)
+        self._swh_config = None  # Store config for lazy initialization
     
     async def identify(
         self,
@@ -147,6 +145,12 @@ class SourceIdentifier:
     ) -> List[Dict[str, Any]]:
         """Identify using Software Heritage archive."""
         candidates = []
+        
+        # Lazily create SWH client only when needed
+        if self.swh_client is None:
+            from ..core.config import SWHPIConfig
+            config = SWHPIConfig(verbose=self.verbose)
+            self.swh_client = SoftwareHeritageClient(config)
         
         # Scan directory
         from ..core.config import SWHPIConfig

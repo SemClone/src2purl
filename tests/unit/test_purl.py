@@ -2,7 +2,7 @@
 
 import pytest
 
-from swhpi.core.purl import PURLGenerator
+from src2id.core.purl import PURLGenerator
 
 
 class TestPURLGenerator:

@@ -1,4 +1,4 @@
-"""Main CLI entry point for SWHPI."""
+"""Main CLI entry point for src2id."""
 
 import asyncio
 import json
@@ -16,10 +16,10 @@ from rich.console import Console
 from rich.table import Table
 from tabulate import tabulate
 
-from swhpi import __version__
-from swhpi.core.config import SWHPIConfig
-from swhpi.core.models import PackageMatch
-from swhpi.core.orchestrator import SHPackageIdentifier
+from src2id import __version__
+from src2id.core.config import SWHPIConfig
+from src2id.core.models import PackageMatch
+from src2id.core.orchestrator import SHPackageIdentifier
 
 console = Console()
 
@@ -108,7 +108,7 @@ def main(
     """
     # Handle cache clearing
     if clear_cache:
-        from swhpi.core.cache import PersistentCache
+        from src2id.core.cache import PersistentCache
         cache = PersistentCache()
         cache.clear()
         stats = cache.get_cache_stats()
@@ -134,7 +134,7 @@ def main(
     )
     
     # Always show analysis header (not just in verbose mode)
-    console.print(f"[dim]SWHPI v{__version__}[/dim]")
+    console.print(f"[dim]src2id v{__version__}[/dim]")
     console.print(f"[dim]Analyzing: {path}[/dim]")
     console.print(f"[dim]Max depth: {max_depth}[/dim]")
     console.print(f"[dim]Confidence threshold: {confidence_threshold}[/dim]")
@@ -149,7 +149,7 @@ def main(
     
     # Show cache status
     if not no_cache:
-        from swhpi.core.cache import PersistentCache
+        from src2id.core.cache import PersistentCache
         cache = PersistentCache()
         stats = cache.get_cache_stats()
         console.print(f"[dim]Cache: {stats['entries']} entries ({stats['total_size_mb']} MB)[/dim]")
@@ -158,7 +158,7 @@ def main(
     try:
         if detect_subcomponents:
             # Use subcomponent detection
-            from swhpi.core.subcomponent_detector import identify_subcomponents
+            from src2id.core.subcomponent_detector import identify_subcomponents
             results = asyncio.run(identify_subcomponents(
                 root_path=path,
                 max_depth=max_depth,
@@ -172,7 +172,7 @@ def main(
             if results.get('subcomponents'):
                 for comp in results['subcomponents']:
                     if comp['identified']:
-                        from swhpi.core.models import PackageMatch, MatchType
+                        from src2id.core.models import PackageMatch, MatchType
                         match = PackageMatch(
                             name=Path(comp['path']).name,
                             version="unknown",
@@ -186,7 +186,7 @@ def main(
                         matches.append(match)
         else:
             # Use the standard identifier
-            from swhpi.core.package_identifier import PackageIdentifier
+            from src2id.core.package_identifier import PackageIdentifier
             identifier = PackageIdentifier(config)
             matches = asyncio.run(identifier.identify_packages(path, enhance_licenses=not no_license_detection))
         
@@ -235,7 +235,7 @@ def show_local_source_analysis(path: Path, config: SWHPIConfig) -> None:
     
     # Detect licenses in local source code
     try:
-        from swhpi.integrations.oslili import OsliliIntegration
+        from src2id.integrations.oslili import OsliliIntegration
         integration = OsliliIntegration()
         
         if integration.available:

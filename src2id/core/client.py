@@ -15,10 +15,10 @@ except ImportError:
     SWH_CLIENT_AVAILABLE = False
     WebAPIClient = None
 
-from swhpi.core.cache import PersistentCache
-from swhpi.core.config import SWHPIConfig
-from swhpi.core.models import MatchType, SHAPIResponse, SHOriginMatch
-from swhpi.utils.datetime_utils import parse_datetime
+from src2id.core.cache import PersistentCache
+from src2id.core.config import SWHPIConfig
+from src2id.core.models import MatchType, SHAPIResponse, SHOriginMatch
+from src2id.utils.datetime_utils import parse_datetime
 
 
 class SoftwareHeritageClient:

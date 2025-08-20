@@ -3,8 +3,8 @@
 from datetime import datetime, timedelta
 from typing import Any, Dict
 
-from swhpi.core.config import SWHPIConfig
-from swhpi.utils.datetime_utils import parse_datetime
+from src2id.core.config import SWHPIConfig
+from src2id.utils.datetime_utils import parse_datetime
 
 
 class ConfidenceScorer:

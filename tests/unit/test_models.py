@@ -4,7 +4,7 @@ import pytest
 from datetime import datetime
 from pathlib import Path
 
-from swhpi.core.models import (
+from src2id.core.models import (
     MatchType,
     DirectoryCandidate,
     SHOriginMatch,

@@ -3,7 +3,7 @@
 import pytest
 from datetime import datetime
 
-from swhpi.utils.datetime_utils import parse_datetime
+from src2id.utils.datetime_utils import parse_datetime
 
 
 class TestParseDatetime:

@@ -7,9 +7,9 @@ from typing import List, Optional
 from rich.console import Console
 from rich.progress import Progress, SpinnerColumn, TextColumn
 
-from swhpi.core.config import SWHPIConfig
-from swhpi.core.models import PackageMatch, MatchType
-from swhpi.search import identify_source
+from src2id.core.config import SWHPIConfig
+from src2id.core.models import PackageMatch, MatchType
+from src2id.search import identify_source
 
 console = Console()
 
@@ -77,7 +77,7 @@ class PackageIdentifier:
                 # Enhance with license detection if requested
                 if enhance_licenses:
                     try:
-                        from swhpi.integrations.oslili import OsliliIntegration
+                        from src2id.integrations.oslili import OsliliIntegration
                         integration = OsliliIntegration()
                         
                         if integration.available:

@@ -6,7 +6,7 @@ from typing import Optional
 
 import click
 
-from swhpi.core.swhid import SWHIDGenerator
+from src2id.core.swhid import SWHIDGenerator
 
 
 @click.command()

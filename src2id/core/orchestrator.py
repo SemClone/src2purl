@@ -8,9 +8,9 @@ from typing import List, Optional, Tuple
 from rich.console import Console
 from rich.progress import Progress, SpinnerColumn, TextColumn
 
-from swhpi.core.config import SWHPIConfig
-from swhpi.core.models import DirectoryCandidate, ContentCandidate, MatchType, PackageMatch, SHOriginMatch
-from swhpi.search import SourceIdentifier, create_default_registry
+from src2id.core.config import SWHPIConfig
+from src2id.core.models import DirectoryCandidate, ContentCandidate, MatchType, PackageMatch, SHOriginMatch
+from src2id.search import SourceIdentifier, create_default_registry
 
 console = Console()
 
@@ -36,7 +36,7 @@ class SHPackageIdentifier:
     def swhid_generator(self):
         """Lazy load SWHID generator."""
         if self._swhid_generator is None:
-            from swhpi.core.swhid import SWHIDGenerator
+            from src2id.core.swhid import SWHIDGenerator
             self._swhid_generator = SWHIDGenerator()
         return self._swhid_generator
     
@@ -44,7 +44,7 @@ class SHPackageIdentifier:
     def sh_client(self):
         """Lazy load Software Heritage client."""
         if self._sh_client is None:
-            from swhpi.core.client import SoftwareHeritageClient
+            from src2id.core.client import SoftwareHeritageClient
             self._sh_client = SoftwareHeritageClient(self.config)
         return self._sh_client
     
@@ -52,7 +52,7 @@ class SHPackageIdentifier:
     def scanner(self):
         """Lazy load directory scanner."""
         if self._scanner is None:
-            from swhpi.core.scanner import DirectoryScanner
+            from src2id.core.scanner import DirectoryScanner
             self._scanner = DirectoryScanner(self.config, self.swhid_generator)
         return self._scanner
     
@@ -60,7 +60,7 @@ class SHPackageIdentifier:
     def coordinate_extractor(self):
         """Lazy load package coordinate extractor."""
         if self._coordinate_extractor is None:
-            from swhpi.core.extractor import PackageCoordinateExtractor
+            from src2id.core.extractor import PackageCoordinateExtractor
             self._coordinate_extractor = PackageCoordinateExtractor()
         return self._coordinate_extractor
     
@@ -68,7 +68,7 @@ class SHPackageIdentifier:
     def confidence_scorer(self):
         """Lazy load confidence scorer."""
         if self._confidence_scorer is None:
-            from swhpi.core.scorer import ConfidenceScorer
+            from src2id.core.scorer import ConfidenceScorer
             self._confidence_scorer = ConfidenceScorer(self.config)
         return self._confidence_scorer
     
@@ -76,7 +76,7 @@ class SHPackageIdentifier:
     def purl_generator(self):
         """Lazy load PURL generator."""
         if self._purl_generator is None:
-            from swhpi.core.purl import PURLGenerator
+            from src2id.core.purl import PURLGenerator
             self._purl_generator = PURLGenerator()
         return self._purl_generator
     
@@ -152,7 +152,7 @@ class SHPackageIdentifier:
             # Step 5: Optionally enhance with oslili license detection
             if enhance_licenses:
                 try:
-                    from swhpi.integrations.oslili import enhance_with_oslili
+                    from src2id.integrations.oslili import enhance_with_oslili
                     final_matches = enhance_with_oslili(final_matches, path)
                     # License enhancement is now silent by default
                 except ImportError:
@@ -231,7 +231,7 @@ class SHPackageIdentifier:
             subdir = path / dir_name
             if subdir.exists() and subdir.is_dir():
                 try:
-                    from swhpi.core.models import DirectoryCandidate
+                    from src2id.core.models import DirectoryCandidate
                     
                     file_count = sum(1 for _ in subdir.rglob('*') if _.is_file())
                     if file_count >= 3:  # Low threshold for subdirs

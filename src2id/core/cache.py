@@ -6,7 +6,7 @@ from pathlib import Path
 from datetime import datetime, timedelta
 from typing import Any, Dict, Optional
 
-from swhpi.core.models import SHAPIResponse
+from src2id.core.models import SHAPIResponse
 
 
 class PersistentCache:

@@ -272,7 +272,7 @@ async def identify_subcomponents(
     Returns:
         Dictionary with identification results for all subcomponents
     """
-    from swhpi.search import identify_source
+    from src2id.search import identify_source
     
     # Detect subcomponents
     detector = SubcomponentDetector(verbose=verbose)

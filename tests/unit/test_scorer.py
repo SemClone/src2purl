@@ -3,9 +3,9 @@
 import pytest
 from datetime import datetime, timedelta
 
-from swhpi.core.config import SWHPIConfig
-from swhpi.core.scorer import ConfidenceScorer
-from swhpi.core.models import MatchType
+from src2id.core.config import SWHPIConfig
+from src2id.core.scorer import ConfidenceScorer
+from src2id.core.models import MatchType
 
 
 class TestConfidenceScorer:

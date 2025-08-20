@@ -4,8 +4,8 @@ import os
 from pathlib import Path
 from typing import List, Optional, Set, Tuple
 
-from swhpi.core.config import SWHPIConfig
-from swhpi.core.models import DirectoryCandidate, ContentCandidate
+from src2id.core.config import SWHPIConfig
+from src2id.core.models import DirectoryCandidate, ContentCandidate
 
 
 class DirectoryScanner:

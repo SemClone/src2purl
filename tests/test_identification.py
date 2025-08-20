@@ -9,14 +9,14 @@ from rich.console import Console
 from rich.table import Table
 from rich.progress import Progress
 
-from swhpi.search import (
+from src2id.search import (
     SourceIdentifier,
     identify_source,
     HashSearcher,
     create_default_registry
 )
-from swhpi.core.client import SoftwareHeritageClient
-from swhpi.core.scanner import DirectoryScanner
+from src2id.core.client import SoftwareHeritageClient
+from src2id.core.scanner import DirectoryScanner
 
 console = Console()
 
@@ -33,10 +33,10 @@ class IdentificationTester:
         """Test Software Heritage identification."""
         console.print("\n[bold cyan]Testing SWH Identification[/bold cyan]")
         
-        from swhpi.core.config import SWHPIConfig
+        from src2id.core.config import SWHPIConfig
         config = SWHPIConfig(verbose=self.verbose, max_depth=2)
         client = SoftwareHeritageClient(config)
-        from swhpi.core.swhid import SWHIDGenerator
+        from src2id.core.swhid import SWHIDGenerator
         scanner = DirectoryScanner(config, SWHIDGenerator())
         
         # Scan directory
