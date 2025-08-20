@@ -93,6 +93,10 @@ testpaths = ["tests"]
 python_files = ["test_*.py"]
 addopts = "-v --cov=src2id --cov-report=term-missing"
 asyncio_mode = "auto"
+markers = [
+    "integration: mark test as an integration test",
+    "asyncio: mark test as async"
+]
 
 [tool.coverage.run]
 source = ["src2id"]
