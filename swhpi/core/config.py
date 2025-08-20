@@ -6,7 +6,7 @@ from typing import Dict
 
 @dataclass
 class SWHPIConfig:
-    """Configuration for the SH Package Identifier tool."""
+    """Configuration for the Source Package Identifier tool."""
     
     # Directory scanning parameters
     max_depth: int = 5  # Maximum parent directory levels to scan
@@ -25,9 +25,12 @@ class SWHPIConfig:
         'specificity': 0.2
     })
     
-    # API configuration
+    # Software Heritage API configuration (optional)
     sh_api_base: str = "https://archive.softwareheritage.org/api/1"
     api_token: str = ""  # Optional API token for authentication (bypasses rate limits)
+    use_swh: bool = False  # Whether to include SWH in identification strategies
+    
+    # General API configuration
     rate_limit_delay: float = 0.5  # Seconds between API calls
     request_timeout: float = 30.0  # Timeout for API requests in seconds
     max_retries: int = 3

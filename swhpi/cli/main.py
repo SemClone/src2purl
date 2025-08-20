@@ -61,6 +61,11 @@ console = Console()
     help="Skip automatic license detection from local source code",
 )
 @click.option(
+    "--use-swh",
+    is_flag=True,
+    help="Include Software Heritage archive checking (slower but more comprehensive)",
+)
+@click.option(
     "--api-token",
     envvar="SWH_API_TOKEN",
     help="Software Heritage API token for authentication (can also be set via SWH_API_TOKEN env var)",
@@ -81,13 +86,15 @@ def main(
     no_cache: bool,
     clear_cache: bool,
     no_license_detection: bool,
+    use_swh: bool,
     api_token: Optional[str],
     verbose: bool,
 ) -> None:
     """
-    Software Heritage Package Identifier - Identify package coordinates from source code.
+    Source Package Identifier - Identify package coordinates from source code.
     
-    Analyzes the given PATH to identify packages using Software Heritage archive.
+    Analyzes the given PATH to identify packages using multiple identification strategies
+    including SCANOSS fingerprinting, hash search, and optionally Software Heritage archive.
     """
     # Handle cache clearing
     if clear_cache:
@@ -113,6 +120,7 @@ def main(
         output_format=output_format,
         api_token=api_token or "",
         verbose=verbose,
+        use_swh=use_swh,
     )
     
     # Always show analysis header (not just in verbose mode)
@@ -121,9 +129,13 @@ def main(
     console.print(f"[dim]Max depth: {max_depth}[/dim]")
     console.print(f"[dim]Confidence threshold: {confidence_threshold}[/dim]")
     
-    # Show authentication status
-    if api_token:
-        console.print(f"[dim]API auth: [green]✓ Using API token[/green][/dim]")
+    # Show strategy configuration
+    if use_swh:
+        console.print(f"[dim]Strategies: SCANOSS, Hash Search, Web Search, SWH[/dim]")
+        if api_token:
+            console.print(f"[dim]SWH auth: [green]✓ Using API token[/green][/dim]")
+    else:
+        console.print(f"[dim]Strategies: SCANOSS, Hash Search, Web Search[/dim]")
     
     # Show cache status
     if not no_cache:
@@ -134,8 +146,9 @@ def main(
     console.print()
     
     try:
-        # Run the identifier
-        identifier = SHPackageIdentifier(config)
+        # Use the optimized identifier
+        from swhpi.core.package_identifier import PackageIdentifier
+        identifier = PackageIdentifier(config)
         matches = asyncio.run(identifier.identify_packages(path, enhance_licenses=not no_license_detection))
         
         # Output results

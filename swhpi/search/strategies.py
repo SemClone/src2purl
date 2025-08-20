@@ -52,7 +52,8 @@ class SourceIdentifier:
         path: Path,
         max_depth: int = 3,
         confidence_threshold: float = 0.5,
-        strategies: Optional[List[str]] = None
+        strategies: Optional[List[str]] = None,
+        use_swh: bool = False
     ) -> Dict[str, Any]:
         """Identify the source of a directory using multiple strategies.
         
@@ -60,7 +61,8 @@ class SourceIdentifier:
             path: Path to analyze
             max_depth: Maximum depth for recursive scanning
             confidence_threshold: Minimum confidence for identification
-            strategies: List of strategies to use (default: all)
+            strategies: List of strategies to use (default: optimized order)
+            use_swh: Whether to include Software Heritage checking
             
         Returns:
             Dictionary with identification results
@@ -75,13 +77,19 @@ class SourceIdentifier:
         }
         
         available_strategies = {
-            "swh": self._identify_via_swh,
-            "hash_search": self._identify_via_hash_search,
             "scanoss": self._identify_via_scanoss,
-            "web_search": self._identify_via_web_search
+            "hash_search": self._identify_via_hash_search,
+            "web_search": self._identify_via_web_search,
+            "swh": self._identify_via_swh
         }
         
-        strategies_to_use = strategies or list(available_strategies.keys())
+        # Default optimized order (best performers first)
+        if strategies is None:
+            strategies_to_use = ["scanoss", "hash_search", "web_search"]
+            if use_swh:
+                strategies_to_use.append("swh")
+        else:
+            strategies_to_use = strategies
         
         all_candidates = []
         
@@ -210,22 +218,30 @@ class SourceIdentifier:
         try:
             await scanoss.ensure_session()
             
-            # Scan directory
-            results = await scanoss.scan_directory(path, max_files=5)
+            # Use scan_file for individual files as scan_directory is not available
+            # in the consolidated provider
+            test_files = list(path.glob("**/*.c"))[:2] + list(path.glob("**/*.md"))[:1]
             
-            # Extract repositories
-            repos = []
-            for file_result in results.values():
-                for match in file_result.get("matches", []):
-                    if "repository" in match:
-                        repos.append(match["repository"])
-                        candidates.append({
-                            "source": "scanoss",
-                            "component": match.get("component", ""),
-                            "origin": match["repository"],
-                            "confidence": match.get("matched_percent", 0) / 100.0
-                        })
+            if not test_files:
+                test_files = list(path.iterdir())[:3]
             
+            for test_file in test_files:
+                if test_file.is_file():
+                    result = await scanoss.scan_file(test_file)
+                    # Parse SCANOSS results if available
+                    if result and isinstance(result, dict):
+                        for file_name, file_data in result.items():
+                            if isinstance(file_data, list):
+                                for match in file_data:
+                                    if isinstance(match, dict) and match.get("component"):
+                                        url = match.get("url", "")
+                                        if "github.com" in url or "gitlab.com" in url:
+                                            candidates.append({
+                                                "source": "scanoss",
+                                                "component": match.get("component", ""),
+                                                "origin": url,
+                                                "confidence": match.get("matched", 0) / 100.0
+                                            })
         finally:
             await scanoss.close()
         
@@ -287,7 +303,8 @@ async def identify_source(
     max_depth: int = 3,
     confidence_threshold: float = 0.5,
     verbose: bool = False,
-    strategies: Optional[List[str]] = None
+    strategies: Optional[List[str]] = None,
+    use_swh: bool = False
 ) -> Dict[str, Any]:
     """Convenience function for source identification.
     
@@ -297,6 +314,7 @@ async def identify_source(
         confidence_threshold: Minimum confidence for identification
         verbose: Enable verbose output
         strategies: List of strategies to use
+        use_swh: Whether to include Software Heritage checking
         
     Returns:
         Identification results
@@ -306,7 +324,8 @@ async def identify_source(
         path=path,
         max_depth=max_depth,
         confidence_threshold=confidence_threshold,
-        strategies=strategies
+        strategies=strategies,
+        use_swh=use_swh
     )
     
     if verbose:
