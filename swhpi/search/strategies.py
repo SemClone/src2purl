@@ -116,6 +116,10 @@ class SourceIdentifier:
                 if self.verbose:
                     console.print(f"[yellow]⚠ {strategy_name} failed: {e}[/yellow]")
         
+        # Clean up any open sessions
+        if hasattr(self, 'search_registry') and self.search_registry:
+            await self.search_registry.close_all()
+        
         # Aggregate and score candidates
         if all_candidates:
             origin_scores = Counter()
@@ -236,11 +240,18 @@ class SourceIdentifier:
                                     if isinstance(match, dict) and match.get("component"):
                                         url = match.get("url", "")
                                         if "github.com" in url or "gitlab.com" in url:
+                                            # Ensure matched is numeric
+                                            matched_val = match.get("matched", 0)
+                                            if isinstance(matched_val, str):
+                                                try:
+                                                    matched_val = float(matched_val)
+                                                except (ValueError, TypeError):
+                                                    matched_val = 0
                                             candidates.append({
                                                 "source": "scanoss",
                                                 "component": match.get("component", ""),
                                                 "origin": url,
-                                                "confidence": match.get("matched", 0) / 100.0
+                                                "confidence": matched_val / 100.0 if matched_val else 0.5
                                             })
         finally:
             await scanoss.close()
@@ -320,15 +331,20 @@ async def identify_source(
         Identification results
     """
     identifier = SourceIdentifier(verbose=verbose)
-    results = await identifier.identify(
-        path=path,
-        max_depth=max_depth,
-        confidence_threshold=confidence_threshold,
-        strategies=strategies,
-        use_swh=use_swh
-    )
-    
-    if verbose:
-        identifier.print_results(results)
-    
-    return results
+    try:
+        results = await identifier.identify(
+            path=path,
+            max_depth=max_depth,
+            confidence_threshold=confidence_threshold,
+            strategies=strategies,
+            use_swh=use_swh
+        )
+        
+        if verbose:
+            identifier.print_results(results)
+        
+        return results
+    finally:
+        # Ensure cleanup of any open sessions
+        if hasattr(identifier, 'search_registry') and identifier.search_registry:
+            await identifier.search_registry.close_all()

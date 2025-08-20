@@ -4,8 +4,12 @@ import asyncio
 import json
 import os
 import sys
+import warnings
 from pathlib import Path
 from typing import Optional
+
+# Suppress urllib3 warnings about LibreSSL
+warnings.filterwarnings('ignore', message='urllib3 v2 only supports OpenSSL')
 
 import click
 from rich.console import Console
