@@ -28,3 +28,19 @@ repos:
       - id: mypy
         additional_dependencies: [types-all]
         args: [--ignore-missing-imports]
+
+  - repo: local
+    hooks:
+      - id: no-claude-mentions
+        name: Check for Claude mentions
+        entry: sh -c 'git diff --cached --name-only -z | xargs -0 grep -l -i -E "claude|anthropic|🤖" || exit 0; if [ $? -eq 0 ]; then echo "Error: Found Claude/Anthropic mentions in staged files. Please remove them."; exit 1; fi'
+        language: system
+        pass_filenames: false
+        always_run: true
+      - id: no-claude-in-commit-msg
+        name: Check commit message for Claude mentions
+        entry: sh -c 'if echo "$1" | grep -i -E "claude|anthropic|🤖|generated with|co-authored-by.*claude" > /dev/null; then echo "Error: Commit message contains Claude/Anthropic mentions. Please remove them."; exit 1; fi'
+        language: system
+        stages: [commit-msg]
+        pass_filenames: false
+        always_run: true
