@@ -6,49 +6,40 @@ from pathlib import Path
 from typing import Optional
 
 # Try different SWHID generation methods in order of preference
-# Prefer miniswhid as it's lighter weight and designed for our use case
-HAS_MINISWHID = False
 HAS_SWH_MODEL = False
+HAS_MINISWHID = False
 
 try:
-    import miniswhid
-    HAS_MINISWHID = True
+    from swh.model.cli import model_of_dir
+    from swh.model.from_disk import Content
+    HAS_SWH_MODEL = True
 except ImportError:
     try:
-        from swh.model.cli import model_of_dir
-        from swh.model.from_disk import Content
-        HAS_SWH_MODEL = True
+        import miniswhid
+        HAS_MINISWHID = True
     except ImportError:
         import warnings
         warnings.warn(
             "No accurate SWHID generation available. "
-            "Install miniswhid for accurate SWHID generation: "
-            "pip install miniswhid"
+            "Install swh.model or miniswhid for accurate SWHID generation: "
+            "pip install swh.model"
         )
 
 
 class SWHIDGenerator:
     """
-    Generates Software Heritage Identifiers using miniswhid or swh.model.
-    Prioritizes miniswhid as it's lighter weight and designed for our use case.
+    Generates Software Heritage Identifiers using miniswhid or custom implementation.
     """
     
-    def __init__(self, use_swh_model: bool = None):
+    def __init__(self, use_swh_model: bool = True):
         """
         Initialize the SWHID generator.
         
         Args:
-            use_swh_model: Whether to use swh.model if available.
-                          If None, prefers miniswhid when available.
+            use_swh_model: Whether to use swh.model if available
         """
-        if use_swh_model is None:
-            # Auto-detect: prefer miniswhid over swh.model
-            self.use_miniswhid = HAS_MINISWHID
-            self.use_swh_model = (not self.use_miniswhid) and HAS_SWH_MODEL
-        else:
-            # Manual override
-            self.use_swh_model = use_swh_model and HAS_SWH_MODEL
-            self.use_miniswhid = (not self.use_swh_model) and HAS_MINISWHID
+        self.use_swh_model = use_swh_model and HAS_SWH_MODEL
+        self.use_miniswhid = (not self.use_swh_model) and HAS_MINISWHID
     
     def generate_directory_swhid(self, path: Path) -> str:
         """
