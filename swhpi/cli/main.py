@@ -61,6 +61,11 @@ console = Console()
     help="Skip automatic license detection from local source code",
 )
 @click.option(
+    "--detect-subcomponents",
+    is_flag=True,
+    help="Detect and identify multiple subcomponents in the project",
+)
+@click.option(
     "--use-swh",
     is_flag=True,
     help="Include Software Heritage archive checking (slower but more comprehensive)",
@@ -86,6 +91,7 @@ def main(
     no_cache: bool,
     clear_cache: bool,
     no_license_detection: bool,
+    detect_subcomponents: bool,
     use_swh: bool,
     api_token: Optional[str],
     verbose: bool,
@@ -146,10 +152,39 @@ def main(
     console.print()
     
     try:
-        # Use the optimized identifier
-        from swhpi.core.package_identifier import PackageIdentifier
-        identifier = PackageIdentifier(config)
-        matches = asyncio.run(identifier.identify_packages(path, enhance_licenses=not no_license_detection))
+        if detect_subcomponents:
+            # Use subcomponent detection
+            from swhpi.core.subcomponent_detector import identify_subcomponents
+            results = asyncio.run(identify_subcomponents(
+                root_path=path,
+                max_depth=max_depth,
+                confidence_threshold=confidence_threshold,
+                verbose=verbose,
+                use_swh=use_swh
+            ))
+            
+            # Convert to matches format for output
+            matches = []
+            if results.get('subcomponents'):
+                for comp in results['subcomponents']:
+                    if comp['identified']:
+                        from swhpi.core.models import PackageMatch, MatchType
+                        match = PackageMatch(
+                            name=Path(comp['path']).name,
+                            version="unknown",
+                            confidence_score=comp['confidence'],
+                            match_type=MatchType.EXACT if comp['confidence'] > 0.8 else MatchType.FUZZY,
+                            download_url=comp['repository'],
+                            purl=f"pkg:{comp['type']}/{Path(comp['path']).name}",
+                            license="",
+                            is_official_org=False
+                        )
+                        matches.append(match)
+        else:
+            # Use the standard identifier
+            from swhpi.core.package_identifier import PackageIdentifier
+            identifier = PackageIdentifier(config)
+            matches = asyncio.run(identifier.identify_packages(path, enhance_licenses=not no_license_detection))
         
         # Output results
         if output_format == "json":
