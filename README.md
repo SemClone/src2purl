@@ -37,6 +37,16 @@ cd semantic-copycat-src2id
 pip install -e .
 ```
 
+### Recommended: Install SWHID Generation Library
+
+For accurate Software Heritage Identifier (SWHID) generation, install miniswhid:
+
+```bash
+pip install miniswhid
+```
+
+Note: The tool will fall back to swh.model if available, or use a custom implementation if neither is installed.
+
 
 ## Usage
 
