@@ -131,11 +131,11 @@ def main(
     
     # Show strategy configuration
     if use_swh:
-        console.print(f"[dim]Strategies: SCANOSS, Hash Search, Web Search, SWH[/dim]")
+        console.print(f"[dim]Strategies: Hash Search, Web Search, SCANOSS, SWH[/dim]")
         if api_token:
             console.print(f"[dim]SWH auth: [green]✓ Using API token[/green][/dim]")
     else:
-        console.print(f"[dim]Strategies: SCANOSS, Hash Search, Web Search[/dim]")
+        console.print(f"[dim]Strategies: Hash Search, Web Search, SCANOSS[/dim]")
     
     # Show cache status
     if not no_cache:

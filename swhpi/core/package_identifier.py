@@ -37,7 +37,7 @@ class PackageIdentifier:
         try:
             if self.config.verbose:
                 console.print("[bold blue]Starting package identification...[/bold blue]")
-                console.print("[dim]Using optimized strategy order: SCANOSS → Hash Search → Web Search[/dim]")
+                console.print("[dim]Using optimized strategy order: Hash Search → Web Search → SCANOSS[/dim]")
                 if self.config.use_swh:
                     console.print("[dim]Software Heritage checking enabled[/dim]")
             

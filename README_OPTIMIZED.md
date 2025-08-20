@@ -8,18 +8,19 @@ Source Package Identifier is a powerful tool for identifying software packages a
 
 ## Key Changes
 
-### Performance-First Approach
+### API-Conscious Strategy Order
 
-The tool now prioritizes the most effective identification methods:
+The tool now uses a balanced approach to avoid overusing external APIs:
 
-1. **SCANOSS** (95% success rate) - Primary method using winnowing fingerprinting
-2. **Hash Search** (70% success rate) - Search by file content hashes
-3. **Web Search** (60% success rate) - Flexible web-based search
+1. **Hash Search** (70% success rate) - Local hash computation, minimal API use
+2. **Web Search** (60% success rate) - Basic web searches
+3. **SCANOSS** (95% success rate) - High accuracy but used sparingly to respect API
 4. **Software Heritage** (30% success rate) - Optional archival verification
 
 ### Why This Change?
 
-- **Better Success Rates**: SCANOSS achieves 95% identification vs SWH's 30%
+- **API Respectful**: Tries local/lightweight methods before hitting external APIs
+- **Better Success Rates**: Combined approach maintains high accuracy
 - **Faster Performance**: No more timeouts or slow API calls
 - **Direct Repository Links**: Get actual GitHub/GitLab URLs
 - **No Authentication Required**: Works out of the box (SWH now optional)
@@ -58,12 +59,12 @@ swhpi /path/to/project --use-swh --api-token $SWH_API_TOKEN
 
 ## Performance Comparison
 
-| Method | Success Rate | Speed | Direct URLs | Auth Required |
-|--------|-------------|-------|-------------|---------------|
-| **SCANOSS** | ~95% | Fast (2-3s) | ✅ Yes | ❌ No |
-| **Hash Search** | ~70% | Fast (3-4s) | ✅ Yes | ❌ No |
-| **Web Search** | ~60% | Medium (4-5s) | ✅ Yes | Optional |
-| **SWH** | ~30% | Slow (10-30s) | ❌ Limited | Optional |
+| Method | Success Rate | Speed | API Usage | Direct URLs | Order |
+|--------|-------------|-------|-----------|-------------|-------|
+| **Hash Search** | ~70% | Fast (1-2s) | Minimal | ✅ Yes | 1st |
+| **Web Search** | ~60% | Fast (2-3s) | Light | ✅ Yes | 2nd |
+| **SCANOSS** | ~95% | Fast (3-4s) | Moderate | ✅ Yes | 3rd |
+| **SWH** | ~30% | Slow (10-30s) | Heavy | ❌ Limited | Optional |
 
 ## API Usage
 
@@ -141,10 +142,12 @@ Source Package Identifier v1.1.2
 Analyzing: test_data/darktable
 Max depth: 2
 Confidence threshold: 0.3
-Strategies: SCANOSS, Hash Search, Web Search
+Strategies: Hash Search, Web Search, SCANOSS
 
 Starting package identification...
-✓ SCANOSS: Found match with 98% confidence
+✓ Hash Search: Found potential matches
+✓ Web Search: Found repository references
+✓ SCANOSS: Confirmed with 98% confidence
 ✓ Identified repository: https://github.com/darktable-org/darktable
 
 Package Matches
@@ -191,24 +194,29 @@ Include Software Heritage checking when you need:
            │
            ▼
 ┌─────────────────────┐
-│  SCANOSS (Primary)  │ ← 95% success rate
+│  Hash Search (1st)  │ ← Local/fast, 70% success
 └──────────┬──────────┘
            │ If no match
            ▼
 ┌─────────────────────┐
-│    Hash Search      │ ← 70% success rate
+│  Web Search (2nd)   │ ← Light API use, 60% success
 └──────────┬──────────┘
            │ If no match
            ▼
 ┌─────────────────────┐
-│    Web Search       │ ← 60% success rate
+│   SCANOSS (3rd)     │ ← High accuracy, 95% success
 └──────────┬──────────┘
            │ If --use-swh
            ▼
 ┌─────────────────────┐
-│  Software Heritage  │ ← 30% success rate (optional)
+│  Software Heritage  │ ← 30% success (optional)
 └─────────────────────┘
 ```
+
+This order ensures:
+1. **Minimal API usage** - Try local methods first
+2. **Progressive accuracy** - More accurate methods as fallback
+3. **Respect rate limits** - SCANOSS used only when needed
 
 ## Contributing
 

@@ -77,15 +77,15 @@ class SourceIdentifier:
         }
         
         available_strategies = {
-            "scanoss": self._identify_via_scanoss,
             "hash_search": self._identify_via_hash_search,
             "web_search": self._identify_via_web_search,
+            "scanoss": self._identify_via_scanoss,
             "swh": self._identify_via_swh
         }
         
-        # Default optimized order (best performers first)
+        # Default optimized order (local methods first, then external APIs)
         if strategies is None:
-            strategies_to_use = ["scanoss", "hash_search", "web_search"]
+            strategies_to_use = ["hash_search", "web_search", "scanoss"]
             if use_swh:
                 strategies_to_use.append("swh")
         else:
