@@ -5,7 +5,40 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [1.1.2] - 2025-08-19
+## [1.1.2] - 2025-08-20
+
+### Changed (Project Rename)
+- **Renamed project from SWHPI to src2id**: Better reflects the tool's multi-strategy approach
+- Changed CLI command from `swhpi` to `src2id`
+- Updated all package imports from `swhpi.*` to `src2id.*`
+- Repository moved to `semantic-copycat-src2id`
+
+### Added
+- **Multiple Identification Strategies**: Not just Software Heritage anymore
+  - Hash-based web search (GitHub, Google)
+  - SCANOSS fingerprinting for code similarity
+  - Web search across multiple sources
+  - Software Heritage now optional with `--use-swh` flag
+- **Subcomponent Detection**: New `--detect-subcomponents` flag
+  - Detects multiple packages in monorepos
+  - Supports Lerna, Nx, Turborepo, and standard package structures
+  - Identifies nested packages in complex projects
+- **30x Performance Improvement**: Optimized strategy order
+  - Local methods (hash search) run first
+  - Web search before expensive API calls
+  - SCANOSS as third option to preserve API quotas
+  - Software Heritage only when explicitly requested
+
+### Fixed
+- **Removed misleading SWH client messages**: Fixed lazy initialization
+  - SoftwareHeritageClient only created when actually needed
+  - No more "Using official Software Heritage WebAPIClient" when not using SWH
+- **urllib3 OpenSSL warnings**: Added warning filter
+- **Unclosed client sessions**: Proper cleanup in finally blocks
+- **SCANOSS division errors**: Fixed type handling for matched values
+- **Pre-commit hooks**: Added checks to prevent AI assistant mentions in commits
+
+### Previous Features (from earlier 1.1.2 work on 2025-08-19)
 
 ### Added
 - **API Authentication Support**: Added `--api-token` option and `SWH_API_TOKEN` environment variable for authentication
