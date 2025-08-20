@@ -114,7 +114,7 @@ class TestSWHIDGenerator:
     
     def test_error_on_non_file(self, generator, temp_dir):
         """Test error when path is not a file."""
-        with pytest.raises(ValueError, match="is not a file"):
+        with pytest.raises(ValueError, match="Not a file"):
             generator.generate_content_swhid(temp_dir)
     
     def test_hidden_files_ignored(self, generator, temp_dir):

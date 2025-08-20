@@ -92,10 +92,8 @@ warn_unused_ignores = true
 testpaths = ["tests"]
 python_files = ["test_*.py"]
 addopts = "-v --cov=src2id --cov-report=term-missing"
-asyncio_mode = "auto"
 markers = [
-    "integration: mark test as an integration test",
-    "asyncio: mark test as async"
+    "integration: mark test as an integration test"
 ]
 
 [tool.coverage.run]
