@@ -86,7 +86,34 @@ When using `--use-swh`, you can provide a Software Heritage API token:
    - Via environment variable: `export SWH_API_TOKEN=YOUR_TOKEN`
 
 #### Other APIs
-The tool uses various search APIs (GitHub, Google, SCANOSS) that may have their own rate limits. API keys can be configured via environment variables when needed.
+
+The tool can use several APIs for enhanced functionality. All are optional:
+
+**GitHub API** (Recommended - Free)
+```bash
+export GITHUB_TOKEN=your_github_personal_access_token
+```
+- Creates at: https://github.com/settings/tokens
+- Increases rate limit from 10 to 30 requests/minute
+- Improves repository search accuracy
+
+**SCANOSS API** (Optional - Free)
+```bash
+export SCANOSS_API_KEY=your_scanoss_key
+```
+- Register at: https://www.scanoss.com
+- Provides code fingerprinting and similarity detection
+- Works without key but with rate limits
+
+**SerpAPI** (Optional - Paid)
+```bash
+export SERPAPI_KEY=your_serpapi_key
+```
+- Sign up at: https://serpapi.com
+- Enables Google search for code matching
+- Requires paid subscription
+
+Note: The tool works well without any API keys, just with reduced rate limits.
 
 ### SWHID Validation
 
