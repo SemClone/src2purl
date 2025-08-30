@@ -5,29 +5,49 @@ Identification Library) tool for more accurate license detection in packages.
 """
 
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Set
+from typing import Any, Dict, List, Optional, Set, TYPE_CHECKING
 
 try:
-    from semantic_copycat_oslili import LegalAttributionGenerator
+    from semantic_copycat_oslili import (
+        LicenseCopyrightDetector,
+        DetectionResult,
+        DetectedLicense,
+        CopyrightInfo,
+        Config
+    )
     HAS_OSLILI = True
 except ImportError:
     HAS_OSLILI = False
+    Config = None  # Define Config as None for type hints when oslili not available
 
 
 class OsliliIntegration:
     """Integration with oslili for license detection."""
     
-    def __init__(self):
-        """Initialize oslili integration."""
+    def __init__(self, config: Optional[Any] = None):
+        """Initialize oslili integration.
+        
+        Args:
+            config: Optional Config object for oslili configuration
+        """
         self.available = HAS_OSLILI
         if self.available:
             try:
-                self.generator = LegalAttributionGenerator()
+                # Create config if not provided
+                if config is None and HAS_OSLILI:
+                    config = Config(
+                        verbose=False,
+                        debug=False,
+                        thread_count=4,
+                        similarity_threshold=0.97,
+                        max_recursion_depth=5
+                    )
+                self.detector = LicenseCopyrightDetector(config)
             except Exception:
-                self.generator = None
+                self.detector = None
                 self.available = False
         else:
-            self.generator = None
+            self.detector = None
     
     def detect_licenses(self, path: Path) -> Dict[str, Any]:
         """
@@ -43,7 +63,7 @@ class OsliliIntegration:
             - files: Dict mapping files to their licenses
             - summary: Human-readable summary
         """
-        if not self.available or not self.generator:
+        if not self.available or not self.detector:
             return {
                 "licenses": [],
                 "confidence": 0.0,
@@ -53,43 +73,71 @@ class OsliliIntegration:
             }
         
         try:
-            # Process the path using oslili
-            result = self.generator.process_local_path(str(path))
+            # Process the path using oslili v1.3.2
+            result: DetectionResult = self.detector.process_local_path(str(path))
             
             if result and result.licenses:
                 # Extract license information
                 licenses = []
                 confidence_scores = []
+                files = {}
                 
-                for license_info in result.licenses:
-                    if hasattr(license_info, 'spdx_id'):
-                        licenses.append(license_info.spdx_id)
-                        if hasattr(license_info, 'confidence'):
-                            confidence_scores.append(license_info.confidence)
+                # Group licenses by category for better understanding
+                declared = [l for l in result.licenses if l.category == "declared"]
+                detected = [l for l in result.licenses if l.category == "detected"]
+                referenced = [l for l in result.licenses if l.category == "referenced"]
+                
+                # Prioritize declared licenses, then detected, then referenced
+                all_licenses = declared + detected + referenced
+                
+                for license_info in all_licenses:
+                    licenses.append(license_info.spdx_id)
+                    confidence_scores.append(license_info.confidence)
+                    
+                    # Map files to licenses
+                    if license_info.source_file:
+                        if license_info.source_file not in files:
+                            files[license_info.source_file] = []
+                        files[license_info.source_file].append({
+                            "spdx_id": license_info.spdx_id,
+                            "confidence": license_info.confidence,
+                            "category": license_info.category,
+                            "method": license_info.detection_method
+                        })
                 
                 # Calculate average confidence
                 avg_confidence = sum(confidence_scores) / len(confidence_scores) if confidence_scores else 0.8
                 
                 # Generate summary
                 if licenses:
-                    summary = f"Found {len(licenses)} license(s): {', '.join(licenses[:3])}"
-                    if len(licenses) > 3:
-                        summary += f" and {len(licenses) - 3} more"
+                    # Remove duplicates while preserving order
+                    unique_licenses = list(dict.fromkeys(licenses))
+                    summary = f"Found {len(unique_licenses)} unique license(s): {', '.join(unique_licenses[:3])}"
+                    if len(unique_licenses) > 3:
+                        summary += f" and {len(unique_licenses) - 3} more"
+                    
+                    # Add category info to summary
+                    if declared:
+                        summary += f" (Declared: {len(declared)})"
+                    if detected:
+                        summary += f" (Detected: {len(detected)})"
                 else:
                     summary = "No licenses detected"
                 
                 return {
                     "licenses": licenses,
                     "confidence": avg_confidence,
-                    "files": {},
-                    "summary": summary
+                    "files": files,
+                    "summary": summary,
+                    "copyrights": [c.to_dict() for c in result.copyrights] if result.copyrights else []
                 }
             else:
                 return {
                     "licenses": [],
                     "confidence": 0.0,
                     "files": {},
-                    "summary": "No licenses detected"
+                    "summary": "No licenses detected",
+                    "copyrights": []
                 }
                 
         except Exception as e:
@@ -122,19 +170,32 @@ class OsliliIntegration:
         
         # Update match if we found licenses with good confidence
         if license_info["licenses"] and license_info["confidence"] > 0.7:
-            # Use the most common license as primary
-            primary_license = license_info["licenses"][0]
+            # Remove duplicates while preserving order
+            unique_licenses = list(dict.fromkeys(license_info["licenses"]))
+            
+            # Use the most confident license as primary
+            primary_license = unique_licenses[0]
             
             # Update match license if not already set or if ours is more confident
             if not match.license or license_info["confidence"] > 0.85:
                 match.license = primary_license
             
-            # Add metadata about additional licenses
-            if len(license_info["licenses"]) > 1:
-                if not hasattr(match, "metadata"):
-                    match.metadata = {}
-                match.metadata["additional_licenses"] = license_info["licenses"][1:]
-                match.metadata["license_confidence"] = license_info["confidence"]
+            # Add metadata about additional licenses and copyrights
+            if not hasattr(match, "metadata"):
+                match.metadata = {}
+            
+            if len(unique_licenses) > 1:
+                match.metadata["additional_licenses"] = unique_licenses[1:]
+            
+            match.metadata["license_confidence"] = license_info["confidence"]
+            
+            # Add copyright information if available
+            if license_info.get("copyrights"):
+                match.metadata["copyrights"] = license_info["copyrights"]
+            
+            # Add file mapping if available
+            if license_info.get("files"):
+                match.metadata["license_files"] = license_info["files"]
         
         return match
     
