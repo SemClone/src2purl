@@ -5,7 +5,7 @@ Identification Library) tool for more accurate license detection in packages.
 """
 
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Set, TYPE_CHECKING
+from typing import Any, Dict, List, Optional
 
 try:
     from semantic_copycat_oslili import (
@@ -111,7 +111,7 @@ class OsliliIntegration:
                 # Generate summary
                 if licenses:
                     # Remove duplicates while preserving order
-                    unique_licenses = list(dict.fromkeys(licenses))
+                    unique_licenses = self._deduplicate_licenses(licenses)
                     summary = f"Found {len(unique_licenses)} unique license(s): {', '.join(unique_licenses[:3])}"
                     if len(unique_licenses) > 3:
                         summary += f" and {len(unique_licenses) - 3} more"
@@ -149,7 +149,9 @@ class OsliliIntegration:
                 "error": str(e)
             }
     
-    
+    def _deduplicate_licenses(self, licenses: List[str]) -> List[str]:
+        """Remove duplicates while preserving order."""
+        return list(dict.fromkeys(licenses))
     
     def enhance_package_match(self, match: "PackageMatch", path: Path) -> "PackageMatch":
         """
@@ -171,7 +173,7 @@ class OsliliIntegration:
         # Update match if we found licenses with good confidence
         if license_info["licenses"] and license_info["confidence"] > 0.7:
             # Remove duplicates while preserving order
-            unique_licenses = list(dict.fromkeys(license_info["licenses"]))
+            unique_licenses = self._deduplicate_licenses(license_info["licenses"])
             
             # Use the most confident license as primary
             primary_license = unique_licenses[0]
@@ -199,39 +201,6 @@ class OsliliIntegration:
         
         return match
     
-    def find_license_files(self, path: Path) -> List[Path]:
-        """
-        Find common license files in a directory.
-        
-        Args:
-            path: Directory to search
-            
-        Returns:
-            List of paths to license files
-        """
-        license_patterns = [
-            "LICENSE", "LICENSE.*", "LICENCE", "LICENCE.*",
-            "COPYING", "COPYING.*", "COPYRIGHT", "COPYRIGHT.*",
-            "NOTICE", "NOTICE.*", "LEGAL", "LEGAL.*",
-            "MIT-LICENSE", "APACHE-LICENSE", "BSD-LICENSE",
-            "GPL-LICENSE", "LGPL-LICENSE"
-        ]
-        
-        license_files = []
-        for pattern in license_patterns:
-            license_files.extend(path.glob(pattern))
-            license_files.extend(path.glob(pattern.lower()))
-        
-        # Also check in common subdirectories
-        for subdir in ["docs", "doc", "legal", "licenses"]:
-            subpath = path / subdir
-            if subpath.exists():
-                for pattern in license_patterns:
-                    license_files.extend(subpath.glob(pattern))
-                    license_files.extend(subpath.glob(pattern.lower()))
-        
-        # Remove duplicates and return
-        return list(set(license_files))
 
 
 def enhance_with_oslili(package_matches: List["PackageMatch"], base_path: Path) -> List["PackageMatch"]:
