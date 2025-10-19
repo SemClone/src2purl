@@ -185,9 +185,8 @@ def main(
                         )
                         matches.append(match)
         else:
-            # Use the standard identifier
-            from src2id.core.package_identifier import PackageIdentifier
-            identifier = PackageIdentifier(config)
+            # Use the standard identifier with UPMEX integration
+            identifier = SHPackageIdentifier(config)
             matches = asyncio.run(identifier.identify_packages(path, enhance_licenses=not no_license_detection))
         
         # Output results

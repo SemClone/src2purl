@@ -31,6 +31,7 @@ class SHPackageIdentifier:
         self._purl_generator = None
         self._source_identifier = None
         self._search_registry = None
+        self._upmex_integration = None
     
     @property
     def swhid_generator(self):
@@ -97,6 +98,14 @@ class SHPackageIdentifier:
         if self._search_registry is None:
             self._search_registry = create_default_registry(verbose=self.config.verbose)
         return self._search_registry
+
+    @property
+    def upmex_integration(self):
+        """Lazy load UPMEX integration."""
+        if self._upmex_integration is None:
+            from src2id.integrations.upmex import UpmexIntegration
+            self._upmex_integration = UpmexIntegration(enabled=True)
+        return self._upmex_integration
     
     async def identify_packages(self, path: Path, enhance_licenses: bool = True) -> List[PackageMatch]:
         """
@@ -112,8 +121,27 @@ class SHPackageIdentifier:
         try:
             if self.config.verbose:
                 console.print("[bold blue]Starting package identification...[/bold blue]")
-            
-            # Step 1: Scan directories and files to generate candidates
+
+            # Step 0: Try UPMEX direct metadata extraction first
+            upmex_matches = self._extract_with_upmex(path)
+            if upmex_matches:
+                if self.config.verbose:
+                    console.print(f"[green]✓ Found {len(upmex_matches)} packages via direct metadata extraction[/green]")
+
+                # Enhance with oslili if requested
+                if enhance_licenses:
+                    try:
+                        from src2id.integrations.oslili import enhance_with_oslili
+                        upmex_matches = enhance_with_oslili(upmex_matches, path)
+                    except ImportError:
+                        if self.config.verbose:
+                            console.print("[yellow]oslili not available for license enhancement[/yellow]")
+
+                return upmex_matches
+
+            # Step 1: Scan directories and files to generate candidates (fallback to Software Heritage)
+            if self.config.verbose:
+                console.print("[dim]No package metadata files found - falling back to Software Heritage archive search[/dim]")
             dir_candidates, file_candidates = await self._scan_directories(path)
             
             if not dir_candidates and not file_candidates:
@@ -166,6 +194,39 @@ class SHPackageIdentifier:
             # Clean up the session if it was created
             if self._sh_client is not None:
                 await self._sh_client.close_session()
+
+    def _extract_with_upmex(self, path: Path) -> List[PackageMatch]:
+        """
+        Try to extract package metadata directly using UPMEX.
+
+        Args:
+            path: Directory path to analyze
+
+        Returns:
+            List of package matches found via direct metadata extraction
+        """
+        if not self.upmex_integration.enabled:
+            return []
+
+        try:
+            matches = self.upmex_integration.extract_metadata_from_directory(path)
+
+            if self.config.verbose and matches:
+                console.print("[green]Found package metadata files:[/green]")
+                for match in matches:
+                    if match.name:
+                        console.print(f"  [green]📦 {match.name} v{match.version or 'unknown'}[/green]")
+                        if match.license:
+                            console.print(f"    License: {match.license}")
+                        if match.purl:
+                            console.print(f"    PURL: {match.purl}")
+
+            return matches
+
+        except Exception as e:
+            if self.config.verbose:
+                console.print(f"[yellow]UPMEX extraction failed: {e}[/yellow]")
+            return []
     
     async def _scan_directories(self, path: Path) -> Tuple[List[DirectoryCandidate], List[ContentCandidate]]:
         """Scan directories and files to generate SWHID candidates."""
