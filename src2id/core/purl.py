@@ -34,27 +34,33 @@ class PURLGenerator:
         if not self._validate_download_url(download_url):
             return None
         
-        # Generate PURL based on repository type
-        if 'github.com' in download_url:
-            return self._generate_github_purl(download_url, name, version)
-        elif 'gitlab.com' in download_url:
-            return self._generate_gitlab_purl(download_url, name, version)
-        elif 'pypi.org' in download_url:
-            return self._generate_pypi_purl(name, version)
-        elif 'npmjs.org' in download_url or 'npmjs.com' in download_url:
-            return self._generate_npm_purl(name, version)
-        elif 'crates.io' in download_url:
-            return self._generate_cargo_purl(name, version)
-        elif 'rubygems.org' in download_url:
-            return self._generate_gem_purl(name, version)
-        elif 'packagist.org' in download_url:
-            return self._generate_composer_purl(name, version)
-        elif 'nuget.org' in download_url:
-            return self._generate_nuget_purl(name, version)
-        elif 'sourceforge.net' in download_url:
-            return self._generate_generic_purl(download_url, name, version)
-        else:
-            # For unknown sources, use generic PURL if possible
+        # Generate PURL based on repository type using proper URL parsing
+        try:
+            parsed_url = urlparse(download_url)
+            hostname = parsed_url.hostname.lower() if parsed_url.hostname else ''
+
+            if hostname == 'github.com':
+                return self._generate_github_purl(download_url, name, version)
+            elif hostname == 'gitlab.com':
+                return self._generate_gitlab_purl(download_url, name, version)
+            elif hostname == 'pypi.org' or hostname.endswith('.pypi.org'):
+                return self._generate_pypi_purl(name, version)
+            elif hostname in ('npmjs.org', 'npmjs.com', 'registry.npmjs.org'):
+                return self._generate_npm_purl(name, version)
+            elif hostname == 'crates.io':
+                return self._generate_cargo_purl(name, version)
+            elif hostname == 'rubygems.org':
+                return self._generate_gem_purl(name, version)
+            elif hostname == 'packagist.org':
+                return self._generate_composer_purl(name, version)
+            elif hostname == 'nuget.org':
+                return self._generate_nuget_purl(name, version)
+            elif hostname == 'sourceforge.net' or hostname.endswith('.sourceforge.net'):
+                return self._generate_generic_purl(download_url, name, version)
+            else:
+                # For unknown sources, use generic PURL if possible
+                return self._generate_generic_purl(download_url, name, version)
+        except Exception:
             return self._generate_generic_purl(download_url, name, version)
     
     def _validate_download_url(self, url: str) -> bool:
