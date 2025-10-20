@@ -67,12 +67,8 @@ class DirectManifestParser:
             # Scan current directory
             manifest_files.extend(self._scan_single_directory(directory))
 
-            # Scan immediate subdirectories for manifest files
-            for subdir in directory.iterdir():
-                if (subdir.is_dir() and
-                    not subdir.name.startswith('.') and
-                    subdir.name not in {'__pycache__', 'node_modules', 'target', 'build', 'dist'}):
-                    manifest_files.extend(self._scan_single_directory(subdir))
+            # Scan deeper subdirectories for manifest files (up to 3 levels deep)
+            self._scan_recursive_manifests(directory, manifest_files, max_depth=3, current_depth=0)
 
         except (PermissionError, OSError):
             pass
@@ -126,6 +122,8 @@ class DirectManifestParser:
                 return self._parse_pyproject_toml(file_path)
             elif file_path.name == 'setup.py':
                 return self._parse_setup_py(file_path)
+            elif file_path.name == 'setup.cfg':
+                return self._parse_setup_cfg(file_path)
             elif file_path.name == 'pom.xml':
                 return self._parse_pom_xml(file_path)
             elif file_path.name == 'go.mod':
@@ -516,6 +514,78 @@ class DirectManifestParser:
                 grouped[name] = match
 
         return list(grouped.values())
+
+    def _scan_recursive_manifests(self, directory: Path, manifest_files: List[Path], max_depth: int, current_depth: int):
+        """Recursively scan subdirectories for manifest files."""
+        if current_depth >= max_depth:
+            return
+
+        try:
+            for subdir in directory.iterdir():
+                if (subdir.is_dir() and
+                    not subdir.name.startswith('.') and
+                    subdir.name not in {'__pycache__', 'node_modules', 'target', 'build', 'dist', '.git'}):
+
+                    # Scan this subdirectory
+                    manifest_files.extend(self._scan_single_directory(subdir))
+
+                    # Recurse deeper
+                    self._scan_recursive_manifests(subdir, manifest_files, max_depth, current_depth + 1)
+
+        except (PermissionError, OSError):
+            pass
+
+    def _parse_setup_cfg(self, file_path: Path) -> Optional[PackageMatch]:
+        """Parse Python setup.cfg file."""
+        try:
+            import configparser
+
+            config = configparser.ConfigParser()
+            config.read(file_path)
+
+            # Extract metadata from [metadata] section
+            if not config.has_section('metadata'):
+                return None
+
+            metadata_section = config['metadata']
+            name = metadata_section.get('name')
+            version = metadata_section.get('version')
+            license_info = metadata_section.get('license')
+            url = metadata_section.get('url')
+
+            # Try to get repository URL from project_urls
+            repo_url = url
+            if config.has_option('metadata', 'project_urls'):
+                project_urls = metadata_section.get('project_urls', '')
+                for line in project_urls.split('\n'):
+                    if '=' in line:
+                        key, value = line.split('=', 1)
+                        key = key.strip().lower()
+                        if key in ['source', 'repository', 'homepage']:
+                            repo_url = value.strip()
+                            break
+
+            if not name:
+                return None
+
+            # Generate PURL
+            purl = f"pkg:pypi/{name.lower().replace('_', '-')}"
+            if version and not version.startswith('attr:'):
+                purl += f"@{version}"
+
+            return PackageMatch(
+                download_url=repo_url or f"https://pypi.org/project/{name}/",
+                match_type=MatchType.EXACT,
+                confidence_score=0.9,
+                name=name,
+                version=version if not version.startswith('attr:') else None,
+                license=license_info,
+                purl=purl,
+                is_official_org=self._is_official_python_org(repo_url or ''),
+            )
+
+        except (configparser.Error, FileNotFoundError, UnicodeDecodeError):
+            return None
 
     def _is_official_npm_org(self, url: str) -> bool:
         """Check if NPM package is from an official organization."""
