@@ -53,17 +53,29 @@ class SearchProvider(ABC):
     
     def extract_repo_urls(self, urls: List[str]) -> List[str]:
         """Extract and filter repository URLs from a list of URLs."""
+        from urllib.parse import urlparse
+
         repo_urls = []
         for url in urls:
-            if any(host in url for host in ["github.com", "gitlab.com", "bitbucket.org"]):
-                # Clean up the URL
-                if "/blob/" in url or "/tree/" in url:
-                    parts = url.split("/")
-                    if "github.com" in url or "gitlab.com" in url:
-                        base_parts = parts[:5]
-                        repo_urls.append("/".join(base_parts))
-                else:
-                    repo_urls.append(url)
+            try:
+                parsed = urlparse(url)
+                hostname = parsed.hostname.lower() if parsed.hostname else ''
+
+                if hostname in ('github.com', 'gitlab.com', 'bitbucket.org'):
+                    # Clean up the URL - remove file-specific paths
+                    if "/blob/" in url or "/tree/" in url:
+                        if hostname in ('github.com', 'gitlab.com'):
+                            path_parts = parsed.path.strip('/').split('/')
+                            if len(path_parts) >= 2:
+                                # Keep only owner/repo part
+                                clean_path = f"/{path_parts[0]}/{path_parts[1]}"
+                                clean_url = f"{parsed.scheme}://{hostname}{clean_path}"
+                                repo_urls.append(clean_url)
+                    else:
+                        repo_urls.append(url)
+            except Exception:
+                # If URL parsing fails, skip this URL
+                continue
         return list(set(repo_urls))
 
 

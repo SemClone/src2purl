@@ -354,15 +354,19 @@ class SHPackageIdentifier:
         normalized = normalized.replace('.git', '')
         normalized = normalized.rstrip('/')
 
-        # Extract key parts for matching
-        if 'github.com' in normalized:
-            parts = normalized.split('/')
-            if len(parts) >= 3:
-                return f"github.com/{parts[1]}/{parts[2]}"
-        elif 'gitlab.com' in normalized:
-            parts = normalized.split('/')
-            if len(parts) >= 3:
-                return f"gitlab.com/{parts[1]}/{parts[2]}"
+        # Extract key parts for matching using proper URL parsing
+        try:
+            from urllib.parse import urlparse
+            parsed = urlparse(url if url.startswith(('http://', 'https://')) else f'https://{url}')
+            hostname = parsed.hostname.lower() if parsed.hostname else ''
+            path_parts = parsed.path.strip('/').split('/')
+
+            if hostname == 'github.com' and len(path_parts) >= 2:
+                return f"github.com/{path_parts[0]}/{path_parts[1]}"
+            elif hostname == 'gitlab.com' and len(path_parts) >= 2:
+                return f"gitlab.com/{path_parts[0]}/{path_parts[1]}"
+        except Exception:
+            pass
 
         return normalized
     
@@ -767,11 +771,17 @@ class SHPackageIdentifier:
     
     def _extract_base_repo_url(self, url: str) -> str:
         """Extract base repository URL for deduplication."""
-        # Simple extraction - can be improved
-        if 'github.com' in url or 'gitlab.com' in url:
-            parts = url.split('/')
-            if len(parts) >= 5:
-                return '/'.join(parts[:5])
+        try:
+            from urllib.parse import urlparse
+            parsed = urlparse(url)
+            hostname = parsed.hostname.lower() if parsed.hostname else ''
+
+            if hostname in ('github.com', 'gitlab.com'):
+                path_parts = parsed.path.strip('/').split('/')
+                if len(path_parts) >= 2:
+                    return f"{parsed.scheme}://{hostname}/{path_parts[0]}/{path_parts[1]}"
+        except Exception:
+            pass
         return url
     
     def _is_high_confidence_match(self, match: SHOriginMatch) -> bool:

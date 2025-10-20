@@ -42,18 +42,21 @@ class PackageCoordinateExtractor:
         # Start with generic extraction
         coordinates = self._extract_generic_coordinates(url, origin.metadata)
         
-        # Enhance with platform-specific extraction
-        if 'github.com' in url:
+        # Enhance with platform-specific extraction using proper URL parsing
+        parsed_url = urlparse(url)
+        hostname = parsed_url.hostname.lower() if parsed_url.hostname else ''
+
+        if hostname == 'github.com':
             coordinates.update(self._extract_github_coordinates(url, origin.metadata))
-        elif 'gitlab.com' in url:
+        elif hostname == 'gitlab.com':
             coordinates.update(self._extract_gitlab_coordinates(url, origin.metadata))
-        elif 'sourceforge.net' in url:
+        elif hostname == 'sourceforge.net' or hostname.endswith('.sourceforge.net'):
             coordinates.update(self._extract_sourceforge_coordinates(url, origin.metadata))
-        elif 'pypi.org' in url:
+        elif hostname == 'pypi.org' or hostname.endswith('.pypi.org'):
             coordinates.update(self._extract_pypi_coordinates(url))
-        elif 'registry.npmjs.org' in url:
+        elif hostname == 'registry.npmjs.org':
             coordinates.update(self._extract_npm_coordinates(url))
-        elif 'git.kernel.org' in url or 'kernel.org' in url:
+        elif hostname == 'git.kernel.org' or hostname == 'kernel.org':
             coordinates.update(self._extract_kernel_coordinates(url, origin.metadata))
         
         return coordinates
@@ -264,12 +267,18 @@ class PackageCoordinateExtractor:
         Returns:
             True if from official organization
         """
-        for domain, orgs in self.OFFICIAL_ORGS.items():
-            if domain in url:
-                org = self._extract_organization(url, domain)
-                if org and org.lower() in [o.lower() for o in orgs]:
-                    return True
-        return False
+        try:
+            parsed_url = urlparse(url)
+            hostname = parsed_url.hostname.lower() if parsed_url.hostname else ''
+
+            for domain, orgs in self.OFFICIAL_ORGS.items():
+                if hostname == domain or hostname.endswith('.' + domain):
+                    org = self._extract_organization(url, domain)
+                    if org and org.lower() in [o.lower() for o in orgs]:
+                        return True
+            return False
+        except Exception:
+            return False
     
     def _extract_organization(self, url: str, domain: str) -> Optional[str]:
         """
