@@ -1,6 +1,6 @@
 # SRC2ID - Source Code to Package ID
 
-A Python tool that identifies package coordinates (name, version, license, PURL) from source code directories using a comprehensive hybrid discovery strategy with manifest parsing, code fingerprinting, repository search, and optionally Software Heritage archive.
+A Python tool that identifies package coordinates (name, version, license, PURL) from source code directories using an hybrid discovery strategy with manifest parsing, code fingerprinting, repository search, and Software Heritage archive.
 
 ## Overview
 
