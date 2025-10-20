@@ -243,7 +243,7 @@ class SourceIdentifier:
                                 for match in file_data:
                                     if isinstance(match, dict) and match.get("component"):
                                         url = match.get("url", "")
-                                        if "github.com" in url or "gitlab.com" in url:
+                                        if self._is_trusted_git_host(url):
                                             # Ensure matched is numeric
                                             matched_val = match.get("matched", 0)
                                             if isinstance(matched_val, str):
@@ -261,7 +261,44 @@ class SourceIdentifier:
             await scanoss.close()
         
         return candidates
-    
+
+    def _is_trusted_git_host(self, url: str) -> bool:
+        """
+        Check if URL belongs to a trusted Git hosting service.
+
+        Uses proper URL parsing to avoid substring attacks.
+        """
+        if not url:
+            return False
+
+        try:
+            from urllib.parse import urlparse
+            parsed = urlparse(url)
+
+            # Check if hostname exactly matches or is a subdomain of trusted hosts
+            trusted_hosts = {
+                'github.com',
+                'gitlab.com',
+                'gitorious.org',  # Found in our test results
+                'src.fedoraproject.org'  # Found in our test results
+            }
+
+            hostname = parsed.hostname
+            if not hostname:
+                return False
+
+            # Exact match or subdomain of trusted host
+            hostname = hostname.lower()
+            for trusted in trusted_hosts:
+                if hostname == trusted or hostname.endswith('.' + trusted):
+                    return True
+
+            return False
+
+        except Exception:
+            # If URL parsing fails, be conservative and reject
+            return False
+
     async def _identify_via_web_search(
         self,
         path: Path,
