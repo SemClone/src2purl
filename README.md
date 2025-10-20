@@ -1,6 +1,6 @@
 # SRC2ID - Source Code to Package ID
 
-A Python tool that identifies package coordinates (name, version, license, PURL) from source code directories using a comprehensive hybrid discovery strategy with manifest parsing, code fingerprinting, repository search, and optionally Software Heritage archive.
+A Python tool that identifies package coordinates (name, version, license, PURL) from source code directories using an hybrid discovery strategy with manifest parsing, code fingerprinting, repository search, and Software Heritage archive.
 
 ## Overview
 
@@ -23,7 +23,7 @@ src2id uses a **progressive 4-tier discovery strategy** to identify packages:
    - ✅ **Fast execution** (~10 seconds total)
    - ✅ **Good ecosystem identification**
 
-### **Tier 3: Comprehensive Discovery** (Optional, 90+ seconds)
+### **Tier 3: Provenance Discovery** (Optional, 90+ seconds)
 4. **Software Heritage Archive** - Deep source code inventory using content hashing
    - ✅ **Most comprehensive** - finds exact source code matches
    - ✅ **Historical accuracy** - can identify older versions
@@ -117,7 +117,7 @@ src2id /path/to/unknown-code --use-swh
 
 ### API Authentication
 
-**⚠️ No API keys required!** The tool works excellently with the free public APIs. API keys only provide enhanced rate limits and additional features.
+**⚠️ No API keys required!** The tool works with the free public APIs. API keys only provide enhanced rate limits and additional features.
 
 #### Recommended API Keys (Optional)
 
