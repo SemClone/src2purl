@@ -6,7 +6,7 @@ using multiple strategies including SCANOSS, hash search, web search, and
 optionally Software Heritage archive.
 """
 
-__version__ = "1.1.2"
+__version__ = "1.3.1"
 __author__ = "Oscar Valenzuela B."
 
 from src2id.core.config import SWHPIConfig

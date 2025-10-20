@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "semantic-copycat-src2id"
-version = "1.2.2"
+version = "1.3.1"
 description = "Source to ID - Identify package coordinates and repositories from source code using multiple strategies"
 readme = "README.md"
 requires-python = ">=3.9"

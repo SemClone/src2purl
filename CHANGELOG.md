@@ -5,6 +5,69 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.3.1] - 2025-10-19
+
+### Added
+- **Hybrid Discovery Strategy**: Comprehensive package identification using multiple methods
+  - Primary: Hash-based discovery (SWHIDs + Software Heritage) for comprehensive source inventory
+  - Secondary: Manifest parsing (UPMEX integration) to validate findings and add missing packages
+  - Tertiary: GitHub API and SCANOSS fingerprinting for additional coverage
+  - Individual testing capabilities for each discovery method
+- **Comprehensive Manifest Parsing**: Direct manifest file analysis supporting 15+ ecosystems
+  - Python: setup.py, pyproject.toml, setup.cfg, requirements.txt, Pipfile
+  - JavaScript/Node.js: package.json, yarn.lock, package-lock.json
+  - Java/Maven: pom.xml, gradle.build
+  - Go: go.mod, go.sum
+  - Rust: Cargo.toml, Cargo.lock
+  - Ruby: Gemfile, gemspec files
+  - PHP: composer.json, composer.lock
+  - .NET: *.csproj, packages.config, *.nuspec
+- **Enhanced Package Metadata Extraction**:
+  - License detection with confidence scoring
+  - Version extraction from multiple sources (tags, releases, manifest files)
+  - PURL (Package URL) generation across ecosystems
+  - Official organization detection and prioritization
+
+### Security
+- **Fixed URL Substring Sanitization Vulnerabilities**: Comprehensive security improvements
+  - Replaced vulnerable substring-based URL validation with proper URL parsing
+  - Enhanced hostname validation using `urlparse()` for accurate domain matching
+  - Prevents URL validation bypass attacks (e.g., `evil.com/github.com/fake`)
+  - Addresses CodeQL security alerts #1-#25 for incomplete URL substring sanitization
+  - Applied across all modules: extractor.py, orchestrator.py, purl.py, providers.py
+
+### Improved
+- **Performance Optimization**: Software Heritage made optional by default
+  - Use `--use-swh` flag to enable Software Heritage integration
+  - Prevents timeout issues on large codebases
+  - Faster execution for most common use cases
+- **Enhanced Documentation**: Comprehensive README updates
+  - 4-tier discovery strategy explanation
+  - API key setup instructions for GitHub, SCANOSS, SerpAPI
+  - Emphasis on "no API keys required" approach for basic functionality
+  - Updated usage examples and configuration options
+- **Code Quality**: Repository cleanup and maintenance
+  - Removed temporary test files and development artifacts
+  - Improved error handling and logging
+  - Enhanced type safety and validation
+
+### Fixed
+- **Python Version Compatibility**: Added fallback support for Python < 3.11
+  - Graceful handling of `tomllib` import (Python 3.11+ only)
+  - Fallback to `tomli` library for older Python versions
+  - Maintains backward compatibility with Python 3.9+
+- **UPMEX Integration Issues**: Resolved import and dependency conflicts
+  - Created direct manifest parser instead of UPMEX archive-based tool
+  - Handles raw manifest files in source directories
+  - Supports recursive manifest discovery with depth control
+
+### Changed
+- **Discovery Method Prioritization**: Implemented proper hybrid approach
+  - Hash-based discovery prioritized over manifest parsing
+  - Manifest parsing used for validation and enhancement of hash-based results
+  - Software Heritage integration now optional (disabled by default)
+  - Intelligent result merging and deduplication
+
 ## [1.1.2] - 2025-08-20
 
 ### Testing
