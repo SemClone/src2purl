@@ -31,6 +31,7 @@ class SHPackageIdentifier:
         self._purl_generator = None
         self._source_identifier = None
         self._search_registry = None
+        self._upmex_integration = None
     
     @property
     def swhid_generator(self):
@@ -97,6 +98,14 @@ class SHPackageIdentifier:
         if self._search_registry is None:
             self._search_registry = create_default_registry(verbose=self.config.verbose)
         return self._search_registry
+
+    @property
+    def upmex_integration(self):
+        """Lazy load UPMEX integration."""
+        if self._upmex_integration is None:
+            from src2id.integrations.upmex import UpmexIntegration
+            self._upmex_integration = UpmexIntegration(enabled=True)
+        return self._upmex_integration
     
     async def identify_packages(self, path: Path, enhance_licenses: bool = True) -> List[PackageMatch]:
         """
@@ -112,42 +121,61 @@ class SHPackageIdentifier:
         try:
             if self.config.verbose:
                 console.print("[bold blue]Starting package identification...[/bold blue]")
-            
-            # Step 1: Scan directories and files to generate candidates
+
+            # Step 1: PRIMARY - Hash-based discovery (SWHIDs + Software Heritage + Web Search)
+            if self.config.verbose:
+                console.print("[bold blue]Phase 1: Hash-based package discovery[/bold blue]")
+
             dir_candidates, file_candidates = await self._scan_directories(path)
             
-            if not dir_candidates and not file_candidates:
-                if self.config.verbose:
-                    console.print("[yellow]No valid directories or files found to scan[/yellow]")
-                return []
-            
-            # Step 2: Query Software Heritage for matches (both dirs and files)
-            all_matches = await self._find_matches(dir_candidates, file_candidates)
-            
-            if not all_matches:
-                # Only try keyword search if fuzzy matching is enabled
-                if self.config.enable_fuzzy_matching:
+            # Phase 1: Hash-based discovery
+            hash_based_matches = []
+
+            if dir_candidates or file_candidates:
+                # Step 1a: Query for matches based on configuration
+                if self.config.use_swh:
+                    # Query Software Heritage for matches (both dirs and files)
+                    all_matches = await self._find_matches(dir_candidates, file_candidates)
+                else:
+                    all_matches = []
                     if self.config.verbose:
-                        console.print("[yellow]No exact matches found - trying keyword search[/yellow]")
-                    
-                    # Try keyword search as fallback
+                        console.print("[dim]Skipping Software Heritage (use --use-swh to enable)[/dim]")
+
+                if not all_matches:
+                    # Try keyword search with GitHub and SCANOSS
+                    if self.config.verbose:
+                        console.print("[yellow]Trying web search (GitHub, SCANOSS)[/yellow]")
+
+                    # Try keyword search
                     keyword_matches = await self._find_keyword_matches(path)
                     if keyword_matches:
                         all_matches = keyword_matches
-                    else:
-                        if self.config.verbose:
-                            console.print("[yellow]No matches found in Software Heritage[/yellow]")
-                        return []
+
+                # Step 1b: Process hash-based matches
+                if all_matches:
+                    hash_based_matches = await self._process_matches(all_matches)
+                    if self.config.verbose:
+                        console.print(f"[green]✓ Phase 1 complete: Found {len(hash_based_matches)} packages via hash-based discovery[/green]")
                 else:
                     if self.config.verbose:
-                        console.print("[yellow]No exact matches found (fuzzy matching disabled)[/yellow]")
-                    return []
-            
-            # Step 3: Process matches and extract package information
-            package_matches = await self._process_matches(all_matches)
-            
-            # Step 4: Sort and deduplicate results
-            final_matches = self._prioritize_and_deduplicate(package_matches)
+                        console.print("[yellow]Phase 1 complete: No packages found via hash-based discovery[/yellow]")
+
+            # Phase 2: Manifest-based enhancement and supplementation (TEMP DISABLED FOR TESTING)
+            if self.config.verbose:
+                console.print("[bold blue]Phase 2: Manifest-based validation and enhancement (DISABLED FOR TESTING)[/bold blue]")
+
+            # TEMPORARILY DISABLE FOR PERFORMANCE TESTING
+            manifest_matches = []
+            enhanced_matches = hash_based_matches
+
+            if self.config.verbose:
+                hash_count = len(hash_based_matches)
+                manifest_count = len(manifest_matches)
+                final_count = len(enhanced_matches)
+                console.print(f"[green]✓ Phase 2 complete: {hash_count} hash-based + {manifest_count} manifest-based = {final_count} total packages[/green]")
+
+            # Final deduplication and sorting
+            final_matches = self._prioritize_and_deduplicate(enhanced_matches)
             
             # Step 5: Optionally enhance with oslili license detection
             if enhance_licenses:
@@ -166,6 +194,177 @@ class SHPackageIdentifier:
             # Clean up the session if it was created
             if self._sh_client is not None:
                 await self._sh_client.close_session()
+
+    def _extract_with_upmex(self, path: Path) -> List[PackageMatch]:
+        """
+        Try to extract package metadata directly using UPMEX.
+
+        Args:
+            path: Directory path to analyze
+
+        Returns:
+            List of package matches found via direct metadata extraction
+        """
+        if not self.upmex_integration.enabled:
+            return []
+
+        try:
+            matches = self.upmex_integration.extract_metadata_from_directory(path)
+
+            if self.config.verbose and matches:
+                console.print("[green]Found package metadata files:[/green]")
+                for match in matches:
+                    if match.name:
+                        console.print(f"  [green]📦 {match.name} v{match.version or 'unknown'}[/green]")
+                        if match.license:
+                            console.print(f"    License: {match.license}")
+                        if match.purl:
+                            console.print(f"    PURL: {match.purl}")
+
+            return matches
+
+        except Exception as e:
+            if self.config.verbose:
+                console.print(f"[yellow]UPMEX extraction failed: {e}[/yellow]")
+            return []
+
+    def _merge_and_enhance_matches(
+        self,
+        hash_based_matches: List[PackageMatch],
+        manifest_matches: List[PackageMatch],
+        path: Path
+    ) -> List[PackageMatch]:
+        """
+        Intelligently merge hash-based and manifest-based matches.
+
+        Strategy:
+        1. Use manifest data to enhance/validate hash-based matches
+        2. Add manifest-only packages as supplementary findings
+        3. Prefer hash-based discovery but enhance with manifest precision
+
+        Args:
+            hash_based_matches: Packages found via SWHID/Software Heritage
+            manifest_matches: Packages found via manifest parsing
+            path: The scanned directory path
+
+        Returns:
+            Enhanced and merged list of package matches
+        """
+        if not manifest_matches:
+            return hash_based_matches
+
+        if not hash_based_matches:
+            # Only manifest matches found - add them all as supplementary
+            if self.config.verbose:
+                console.print(f"[blue]Adding {len(manifest_matches)} manifest-only packages[/blue]")
+            return manifest_matches
+
+        # Create enhanced results starting with hash-based matches
+        enhanced_matches = list(hash_based_matches)
+
+        # Create lookup for hash-based matches by normalized name/URL
+        hash_lookup = {}
+        for match in hash_based_matches:
+            # Try multiple keys for matching
+            keys = []
+            if match.name:
+                keys.append(match.name.lower())
+                # Handle different name formats (e.g., "org:artifact" vs "artifact")
+                if ':' in match.name:
+                    keys.append(match.name.split(':')[-1].lower())
+            if match.download_url:
+                # Normalize URL for matching
+                normalized_url = self._normalize_url_for_matching(match.download_url)
+                keys.append(normalized_url)
+
+            for key in keys:
+                hash_lookup[key] = match
+
+        # Process manifest matches
+        supplementary_count = 0
+        enhanced_count = 0
+
+        for manifest_match in manifest_matches:
+            # Try to find corresponding hash-based match
+            corresponding_hash_match = None
+
+            # Check by name
+            if manifest_match.name:
+                name_key = manifest_match.name.lower()
+                if name_key in hash_lookup:
+                    corresponding_hash_match = hash_lookup[name_key]
+                elif ':' in manifest_match.name:
+                    # Try just the artifact name
+                    artifact_key = manifest_match.name.split(':')[-1].lower()
+                    if artifact_key in hash_lookup:
+                        corresponding_hash_match = hash_lookup[artifact_key]
+
+            # Check by URL if no name match
+            if not corresponding_hash_match and manifest_match.download_url:
+                url_key = self._normalize_url_for_matching(manifest_match.download_url)
+                if url_key in hash_lookup:
+                    corresponding_hash_match = hash_lookup[url_key]
+
+            if corresponding_hash_match:
+                # ENHANCE: Update hash-based match with manifest precision
+                enhanced_count += 1
+                if self.config.verbose:
+                    console.print(f"[cyan]Enhanced {corresponding_hash_match.name or 'package'} with manifest data[/cyan]")
+
+                # Keep hash-based match but enhance with manifest data
+                if manifest_match.version and not corresponding_hash_match.version:
+                    corresponding_hash_match.version = manifest_match.version
+
+                if manifest_match.license and not corresponding_hash_match.license:
+                    corresponding_hash_match.license = manifest_match.license
+                elif manifest_match.license and corresponding_hash_match.license:
+                    # Combine licenses if different
+                    if manifest_match.license not in corresponding_hash_match.license:
+                        corresponding_hash_match.license = f"{corresponding_hash_match.license}, {manifest_match.license}"
+
+                if manifest_match.purl and not corresponding_hash_match.purl:
+                    corresponding_hash_match.purl = manifest_match.purl
+
+                # Boost confidence slightly for validation
+                corresponding_hash_match.confidence_score = min(1.0, corresponding_hash_match.confidence_score + 0.05)
+
+            else:
+                # SUPPLEMENT: Add manifest-only package
+                supplementary_count += 1
+                if self.config.verbose:
+                    console.print(f"[blue]Added supplementary package: {manifest_match.name or 'unknown'}[/blue]")
+
+                # Slightly lower confidence for manifest-only packages
+                manifest_match.confidence_score = min(0.85, manifest_match.confidence_score)
+                enhanced_matches.append(manifest_match)
+
+        if self.config.verbose and (enhanced_count > 0 or supplementary_count > 0):
+            console.print(f"[green]✓ Enhanced {enhanced_count} packages, added {supplementary_count} supplementary packages[/green]")
+
+        return enhanced_matches
+
+    def _normalize_url_for_matching(self, url: str) -> str:
+        """Normalize URL for matching between hash-based and manifest-based results."""
+        if not url:
+            return ""
+
+        # Remove protocol and common suffixes
+        normalized = url.lower()
+        normalized = normalized.replace('https://', '').replace('http://', '')
+        normalized = normalized.replace('.git', '')
+        normalized = normalized.rstrip('/')
+
+        # Extract key parts for matching
+        if 'github.com' in normalized:
+            parts = normalized.split('/')
+            if len(parts) >= 3:
+                return f"github.com/{parts[1]}/{parts[2]}"
+        elif 'gitlab.com' in normalized:
+            parts = normalized.split('/')
+            if len(parts) >= 3:
+                return f"gitlab.com/{parts[1]}/{parts[2]}"
+
+        return normalized
     
     async def _scan_directories(self, path: Path) -> Tuple[List[DirectoryCandidate], List[ContentCandidate]]:
         """Scan directories and files to generate SWHID candidates."""

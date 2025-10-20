@@ -1,0 +1,44 @@
+src2id v1.1.2
+Analyzing: test_data
+Max depth: 2
+Confidence threshold: 0.3
+Strategies: Hash Search, Web Search, SCANOSS
+Cache: 31 entries (0.04 MB)
+
+
+{
+  "matches": [
+    {
+      "name": "test_data",
+      "version": "unknown",
+      "confidence": 0.75,
+      "type": "fuzzy",
+      "url": "https://github.com/darktable-org/darktable",
+      "purl": "pkg:generic/test_data",
+      "license": "GPL-3.0-only, MIT, BSD-2-Clause",
+      "official": false
+    },
+    {
+      "name": "test_data",
+      "version": "unknown",
+      "confidence": 0.6,
+      "type": "fuzzy",
+      "url": "https://github.com/evidentlyai/evidently",
+      "purl": "pkg:generic/test_data",
+      "license": "",
+      "official": false
+    },
+    {
+      "name": "test_data",
+      "version": "unknown",
+      "confidence": 0.6,
+      "type": "fuzzy",
+      "url": "https://github.com/owid/covid-19-data",
+      "purl": "pkg:generic/test_data",
+      "license": "",
+      "official": false
+    }
+  ],
+  "count": 3,
+  "threshold": 0.3
+}

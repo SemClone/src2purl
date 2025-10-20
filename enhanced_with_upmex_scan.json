@@ -1,0 +1,23 @@
+src2id v1.1.2
+Analyzing: test_data
+Max depth: 2
+Confidence threshold: 0.3
+Strategies: Hash Search, Web Search, SCANOSS
+Cache: 0 entries (0.0 MB)
+
+{
+  "matches": [
+    {
+      "name": null,
+      "version": null,
+      "confidence": 0.95,
+      "type": "exact",
+      "url": "https://pypi.org/project/None/",
+      "purl": null,
+      "license": "GPL-3.0-only",
+      "official": false
+    }
+  ],
+  "count": 1,
+  "threshold": 0.3
+}
