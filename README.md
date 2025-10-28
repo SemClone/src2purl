@@ -4,37 +4,42 @@ A Python tool that identifies package coordinates (name, version, license, PURL)
 
 ## Overview
 
-src2purl uses a **progressive 4-tier discovery strategy** to identify packages:
+src2purl uses a **progressive 2-phase discovery strategy** to identify packages:
 
-### **Tier 1: Fast Manifest Discovery** (1-5 seconds)
-1. **UPMEX Manifest Parsing** - Universal Package Metadata Extractor for package files (package.json, setup.py, pom.xml, go.mod, Cargo.toml, etc.)
-   - ✅ **Perfect metadata extraction** (85-95% confidence)
-   - ✅ **Multi-ecosystem support** (PyPI, NPM, Maven, Go, Ruby Gems)
-   - ✅ **Complete package info** (name, version, license, PURL)
+### **Phase 1: Hash-based Package Discovery** (5-15 seconds)
+**Primary identification using content fingerprinting and repository search:**
 
-### **Tier 2: Parallel Code Discovery** (5-15 seconds)
-2. **SCANOSS Fingerprinting** - Code similarity detection via file fingerprints
-   - ✅ **100% accuracy** when fingerprints exist in database
-   - ✅ **Excellent license detection** with detailed SPDX information
-   - ✅ **Works with any file type** (.c, .py, .cpp, .js, etc.)
+1. **Directory & Content Scanning** - Generate SWHIDs for directories and files
+   - ✅ **Complete file tree analysis** with configurable depth
+   - ✅ **SWHID generation** for precise content identification
+   - ✅ **Smart filtering** of binary files and hidden directories
 
-3. **GitHub Repository Search** - Find repositories using project names and keywords
-   - ✅ **Universal coverage** - finds repositories for any project
-   - ✅ **Fast execution** (~10 seconds total)
-   - ✅ **Good ecosystem identification**
-
-### **Tier 3: Provenance Discovery** (Optional, 90+ seconds)
-4. **Software Heritage Archive** - Deep source code inventory using content hashing
+2. **Software Heritage Archive** (Optional) - Deep provenance discovery
    - ✅ **Most comprehensive** - finds exact source code matches
    - ✅ **Historical accuracy** - can identify older versions
-   - ⚠️ **Requires opt-in** with `--use-swh` due to rate limits
+   - ⚠️ **Requires opt-in** with `--use-swh` due to longer processing time
+
+3. **Keyword Search** (Fallback) - Multi-platform repository discovery
+   - **GitHub API Search** - Repository identification by keywords
+   - **SCANOSS Fingerprinting** - Code similarity detection via file fingerprints
+   - ✅ **Universal coverage** - finds repositories for any project
+   - ✅ **Fast execution** (~10 seconds total)
+
+### **Phase 2: Manifest-based Validation & Enhancement** (1-3 seconds)
+**Authoritative package metadata extraction and result enhancement:**
+
+4. **UPMEX Manifest Parsing** - Universal Package Metadata Extractor
+   - ✅ **Perfect metadata extraction** from package files (package.json, setup.py, pom.xml, go.mod, Cargo.toml, etc.)
+   - ✅ **Multi-ecosystem support** (PyPI, NPM, Maven, Go, Ruby Gems, PHP, .NET)
+   - ✅ **Complete package info** (name, version, license, PURL)
+   - ✅ **Cross-validation** with Phase 1 results for enhanced accuracy
 
 ## Features
 
 ### **Core Capabilities**
-- **Hybrid Discovery Strategy**: Progressive 4-tier approach (manifest → fingerprinting → search → archive)
-- **Multi-Ecosystem Support**: PyPI, NPM, Maven, Go, Ruby Gems, and more
-- **Cross-Method Validation**: SCANOSS confirms GitHub findings, UPMEX provides authoritative manifest data
+- **2-Phase Discovery Strategy**: Hash-based identification enhanced by manifest parsing
+- **Multi-Ecosystem Support**: PyPI, NPM, Maven, Go, Ruby Gems, PHP, .NET, and more
+- **Cross-Phase Validation**: UPMEX manifest data validates and enhances hash-based findings
 - **Confidence Scoring**: Multi-factor scoring (85-100% for exact matches)
 - **Package Coordinate Extraction**: Complete metadata (name, version, license, PURL)
 
@@ -101,18 +106,20 @@ src2purl --clear-cache
 ### Discovery Strategy Examples
 
 ```bash
-# Speed-optimized: Manifest parsing only (1-3 seconds)
-# Good for: Known projects with package files
-src2purl /path/to/npm-project  # Finds package.json automatically
+# Default: 2-Phase hybrid approach (5-15 seconds)
+# Phase 1: Hash-based discovery + Phase 2: UPMEX manifest parsing
+# Good for: Most use cases, balanced speed and accuracy
+src2purl /path/to/project
 
-# Balanced: Default hybrid approach (5-15 seconds)
-# Good for: Most use cases, unknown projects
-src2purl /path/to/unknown-code
-
-# Comprehensive: Include Software Heritage (90+ seconds)
-# Good for: Security audits, research, modified code
+# Comprehensive: Include Software Heritage archive (90+ seconds)
+# Phase 1 includes deep provenance discovery + Phase 2: UPMEX enhancement
+# Good for: Security audits, research, historical analysis
 export SWH_API_TOKEN=your_token  # Optional but recommended
-src2purl /path/to/unknown-code --use-swh
+src2purl /path/to/project --use-swh
+
+# High confidence: Only report confident matches
+# Filters results to highest confidence findings from both phases
+src2purl /path/to/project --confidence-threshold 0.85
 ```
 
 ### API Authentication
@@ -201,15 +208,21 @@ src2purl-validate /path/to/directory --use-fallback --verbose
 
 #### **Discovery Method Breakdown**
 ```bash
-# Default: UPMEX + SCANOSS + GitHub (fast)
+# Default: 2-Phase Discovery (Hash-based + UPMEX manifest parsing)
 src2purl /path/to/project
 
-# Add Software Heritage (comprehensive but slow)
+# Phase 1: SWHID generation → GitHub/SCANOSS search
+# Phase 2: UPMEX manifest extraction → Cross-validation & enhancement
+
+# Add Software Heritage for comprehensive provenance discovery
 src2purl /path/to/project --use-swh
 
-# Speed vs Comprehensiveness trade-off
-src2purl /path/to/project --no-license-detection  # Faster
-src2purl /path/to/project --use-swh --verbose     # Slower but complete
+# Phase 1: SWHID generation → Software Heritage archive → Fallback search
+# Phase 2: UPMEX manifest extraction → Cross-validation & enhancement
+
+# Performance optimization options
+src2purl /path/to/project --no-license-detection  # Skip license enhancement
+src2purl /path/to/project --use-swh --verbose     # Full discovery with details
 ```
 
 ## License
