@@ -5,6 +5,23 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.3.2] - 2025-10-27
+
+### Changed (Project Rebranding)
+- **Renamed project from semantic-copycat-src2id to src2purl**: Better reflects the tool's focus on Package URL (PURL) generation
+- **Updated CLI commands**: Changed from `src2id` to `src2purl` and `src2id-validate` to `src2purl-validate`
+- **Updated project metadata**:
+  - Package name: `semantic-copycat-src2id` → `src2purl`
+  - Repository URLs updated to point to new `src2purl` repository
+  - Project description updated to emphasize PURL generation capabilities
+- **Updated documentation**: README, CHANGELOG, and all references updated to reflect new branding
+- **Updated CLI display**: Version string now shows `src2purl v{version}` instead of `src2id v{version}`
+
+### Technical
+- All package imports and module structure remain unchanged (src2id.*)
+- Backward compatibility maintained for existing integrations
+- No breaking changes to API or functionality
+
 ## [1.3.1] - 2025-10-19
 
 ### Added
@@ -87,10 +104,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Cleaned up test dependencies**: Removed asyncio configuration from pytest
 
 ### Changed (Project Rename)
-- **Renamed project from SWHPI to src2id**: Better reflects the tool's multi-strategy approach
-- Changed CLI command from `swhpi` to `src2id`
-- Updated all package imports from `swhpi.*` to `src2id.*`
-- Repository moved to `semantic-copycat-src2id`
+- **Renamed project from SWHPI to src2purl**: Better reflects the tool's PURL-focused approach
+- Changed CLI command from `swhpi` to `src2purl`
+- Updated all package imports from `swhpi.*` to `src2purl.*`
+- Repository moved to `src2purl`
 
 ### Added
 - **Multiple Identification Strategies**: Not just Software Heritage anymore

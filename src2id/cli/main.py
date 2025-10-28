@@ -1,4 +1,4 @@
-"""Main CLI entry point for src2id."""
+"""Main CLI entry point for src2purl."""
 
 import asyncio
 import json
@@ -134,7 +134,7 @@ def main(
     )
     
     # Always show analysis header (not just in verbose mode)
-    console.print(f"[dim]src2id v{__version__}[/dim]")
+    console.print(f"[dim]src2purl v{__version__}[/dim]")
     console.print(f"[dim]Analyzing: {path}[/dim]")
     console.print(f"[dim]Max depth: {max_depth}[/dim]")
     console.print(f"[dim]Confidence threshold: {confidence_threshold}[/dim]")

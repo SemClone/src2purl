@@ -160,13 +160,15 @@ class SHPackageIdentifier:
                     if self.config.verbose:
                         console.print("[yellow]Phase 1 complete: No packages found via hash-based discovery[/yellow]")
 
-            # Phase 2: Manifest-based enhancement and supplementation (TEMP DISABLED FOR TESTING)
+            # Phase 2: Manifest-based enhancement and supplementation
             if self.config.verbose:
-                console.print("[bold blue]Phase 2: Manifest-based validation and enhancement (DISABLED FOR TESTING)[/bold blue]")
+                console.print("[bold blue]Phase 2: Manifest-based validation and enhancement[/bold blue]")
 
-            # TEMPORARILY DISABLE FOR PERFORMANCE TESTING
-            manifest_matches = []
-            enhanced_matches = hash_based_matches
+            # Extract package metadata directly using UPMEX
+            manifest_matches = self._extract_with_upmex(path)
+
+            # Merge and enhance with manifest data
+            enhanced_matches = self._merge_and_enhance_matches(hash_based_matches, manifest_matches, path)
 
             if self.config.verbose:
                 hash_count = len(hash_based_matches)
