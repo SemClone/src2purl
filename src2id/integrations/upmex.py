@@ -45,34 +45,18 @@ class UpmexIntegration:
 
     def __init__(self, enabled: bool = True):
         """
-        Initialize UPMEX integration with fallback to direct manifest parsing.
+        Initialize UPMEX integration.
 
         Args:
             enabled: Whether UPMEX integration is enabled
         """
         self.enabled = enabled
-        self._extractor = None
         self._manifest_parser = DirectManifestParser()
 
         if enabled:
-            try:
-                # Try to initialize UPMEX for packaged files
-                try:
-                    from upmex import PackageExtractor
-                except ImportError:
-                    # Try with explicit path (development setup)
-                    import sys
-                    sys.path.append('/Users/ovalenzuela/Projects/openpulsar/semantic-copycat-upmex/src')
-                    from upmex import PackageExtractor
-
-                self._extractor = PackageExtractor()
-                logger.info("UPMEX integration initialized successfully")
-            except ImportError:
-                logger.info("UPMEX not available - using direct manifest parsing")
-                # Keep enabled=True since we have the manifest parser as fallback
-            except Exception as e:
-                logger.warning(f"Failed to initialize UPMEX: {e} - using direct manifest parsing")
-                # Keep enabled=True since we have the manifest parser as fallback
+            from upmex import PackageExtractor
+            self._extractor = PackageExtractor()
+            logger.info("UPMEX integration initialized successfully")
 
     def scan_directory_for_packages(self, directory: Path) -> List[Path]:
         """
@@ -104,7 +88,15 @@ class UpmexIntegration:
         if not self.enabled:
             return None
 
-        # Use direct manifest parser for source files
+        try:
+            # Try UPMEX extractor first
+            upmex_metadata = self._extractor.extract_from_file(str(file_path))
+            if upmex_metadata:
+                return self._convert_upmex_metadata(upmex_metadata, file_path)
+        except Exception as e:
+            logger.debug(f"UPMEX extraction failed for {file_path}: {e}")
+
+        # Fallback to direct manifest parser
         return self._manifest_parser.extract_metadata_from_file(file_path)
 
     def extract_metadata_from_directory(self, directory: Path) -> List[PackageMatch]:
@@ -120,8 +112,32 @@ class UpmexIntegration:
         if not self.enabled:
             return []
 
-        # Use direct manifest parser
-        return self._manifest_parser.extract_metadata_from_directory(directory)
+        matches = []
+
+        try:
+            # Try UPMEX extractor for directory
+            upmex_results = self._extractor.extract_from_directory(str(directory))
+            for upmex_metadata in upmex_results:
+                if upmex_metadata:
+                    match = self._convert_upmex_metadata(upmex_metadata, directory)
+                    if match:
+                        matches.append(match)
+        except Exception as e:
+            logger.debug(f"UPMEX directory extraction failed for {directory}: {e}")
+
+        # Also use direct manifest parser for additional coverage
+        manifest_matches = self._manifest_parser.extract_metadata_from_directory(directory)
+        matches.extend(manifest_matches)
+
+        # Deduplicate by package name
+        seen_packages = set()
+        unique_matches = []
+        for match in matches:
+            if match.name and match.name not in seen_packages:
+                seen_packages.add(match.name)
+                unique_matches.append(match)
+
+        return unique_matches
 
     def _convert_upmex_metadata(self, upmex_metadata, source_file: Path) -> PackageMatch:
         """

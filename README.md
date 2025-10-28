@@ -7,7 +7,7 @@ A Python tool that identifies package coordinates (name, version, license, PURL)
 src2purl uses a **progressive 4-tier discovery strategy** to identify packages:
 
 ### **Tier 1: Fast Manifest Discovery** (1-5 seconds)
-1. **UPMEX/Manifest Parsing** - Extract declared dependencies from package files (package.json, setup.py, pom.xml, go.mod, Cargo.toml, etc.)
+1. **UPMEX Manifest Parsing** - Universal Package Metadata Extractor for package files (package.json, setup.py, pom.xml, go.mod, Cargo.toml, etc.)
    - ✅ **Perfect metadata extraction** (85-95% confidence)
    - ✅ **Multi-ecosystem support** (PyPI, NPM, Maven, Go, Ruby Gems)
    - ✅ **Complete package info** (name, version, license, PURL)
@@ -34,7 +34,7 @@ src2purl uses a **progressive 4-tier discovery strategy** to identify packages:
 ### **Core Capabilities**
 - **Hybrid Discovery Strategy**: Progressive 4-tier approach (manifest → fingerprinting → search → archive)
 - **Multi-Ecosystem Support**: PyPI, NPM, Maven, Go, Ruby Gems, and more
-- **Cross-Method Validation**: SCANOSS confirms GitHub findings, UPMEX validates SCANOSS results
+- **Cross-Method Validation**: SCANOSS confirms GitHub findings, UPMEX provides authoritative manifest data
 - **Confidence Scoring**: Multi-factor scoring (85-100% for exact matches)
 - **Package Coordinate Extraction**: Complete metadata (name, version, license, PURL)
 
@@ -46,7 +46,7 @@ src2purl uses a **progressive 4-tier discovery strategy** to identify packages:
 - **Rate Limit Handling**: Automatic backoff and retry logic
 
 ### **Discovery Methods**
-- **UPMEX/Manifest Parsing**: Extract from package.json, setup.py, pom.xml, go.mod, Cargo.toml, etc.
+- **UPMEX Manifest Parsing**: Universal Package Metadata Extractor for all major package ecosystems
 - **SCANOSS Fingerprinting**: 100% accuracy code similarity with detailed license detection
 - **GitHub Repository Search**: Universal coverage repository identification
 - **Software Heritage Archive**: Comprehensive source inventory (opt-in with `--use-swh`)
