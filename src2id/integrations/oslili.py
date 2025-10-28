@@ -8,7 +8,7 @@ from pathlib import Path
 from typing import Any, Dict, List, Optional
 
 try:
-    from semantic_copycat_oslili import (
+    from osslili import (
         LicenseCopyrightDetector,
         DetectionResult,
         DetectedLicense,

@@ -5,6 +5,18 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.3.3] - 2025-10-27
+
+### Fixed
+- **Updated oslili package dependency**: Changed from `semantic-copycat-oslili` to `osslili` to reflect upstream package rebranding
+- **Updated oslili import statements**: Changed import from `semantic_copycat_oslili` to `osslili` in integration module
+- **Maintained backward compatibility**: License enhancement functionality preserved with graceful fallback handling
+
+### Technical
+- All existing functionality remains unchanged
+- Integration properly handles ImportError when osslili package not available
+- No breaking changes to API or core package identification workflow
+
 ## [1.3.2] - 2025-10-27
 
 ### Changed (Project Rebranding)
@@ -147,7 +159,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Falls back to individual requests when official client unavailable
 
 ### Fixed
-- Fixed oslili integration to properly import semantic-copycat-oslili library
+- Fixed oslili integration to properly import osslili library
 - Corrected license detection using LegalAttributionGenerator API
 - Removed duplicate and obsolete methods from oslili integration
 - Fixed directory scanning to traverse subdirectories correctly (not parent directories)
