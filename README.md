@@ -1,10 +1,10 @@
-# SRC2ID - Source Code to Package ID
+# SRC2PURL - Source Code to Package URL
 
 A Python tool that identifies package coordinates (name, version, license, PURL) from source code directories using an hybrid discovery strategy with manifest parsing, code fingerprinting, repository search, and Software Heritage archive.
 
 ## Overview
 
-src2id uses a **progressive 4-tier discovery strategy** to identify packages:
+src2purl uses a **progressive 4-tier discovery strategy** to identify packages:
 
 ### **Tier 1: Fast Manifest Discovery** (1-5 seconds)
 1. **UPMEX/Manifest Parsing** - Extract declared dependencies from package files (package.json, setup.py, pom.xml, go.mod, Cargo.toml, etc.)
@@ -62,8 +62,8 @@ src2id uses a **progressive 4-tier discovery strategy** to identify packages:
 ### From Source
 
 ```bash
-git clone https://github.com/oscarvalenzuelab/semantic-copycat-src2id.git
-cd semantic-copycat-src2id
+git clone https://github.com/oscarvalenzuelab/src2purl.git
+cd src2purl
 pip install -e .
 ```
 
@@ -74,28 +74,28 @@ pip install -e .
 
 ```bash
 # Fast discovery (default) - Uses manifest parsing + SCANOSS + GitHub (5-15 seconds)
-src2id /path/to/source/code
+src2purl /path/to/source/code
 
 # Comprehensive discovery - Includes Software Heritage archive (90+ seconds)
-src2id /path/to/source --use-swh
+src2purl /path/to/source --use-swh
 
 # High confidence matches only
-src2id /path/to/source --confidence-threshold 0.85
+src2purl /path/to/source --confidence-threshold 0.85
 
 # JSON output format for integration
-src2id /path/to/source --output-format json
+src2purl /path/to/source --output-format json
 
 # Detect subcomponents in monorepos
-src2id /path/to/source --detect-subcomponents
+src2purl /path/to/source --detect-subcomponents
 
 # Skip license detection (faster)
-src2id /path/to/source --no-license-detection
+src2purl /path/to/source --no-license-detection
 
 # Verbose output for debugging
-src2id /path/to/source --verbose
+src2purl /path/to/source --verbose
 
 # Clear cache and exit
-src2id --clear-cache
+src2purl --clear-cache
 ```
 
 ### Discovery Strategy Examples
@@ -103,16 +103,16 @@ src2id --clear-cache
 ```bash
 # Speed-optimized: Manifest parsing only (1-3 seconds)
 # Good for: Known projects with package files
-src2id /path/to/npm-project  # Finds package.json automatically
+src2purl /path/to/npm-project  # Finds package.json automatically
 
 # Balanced: Default hybrid approach (5-15 seconds)
 # Good for: Most use cases, unknown projects
-src2id /path/to/unknown-code
+src2purl /path/to/unknown-code
 
 # Comprehensive: Include Software Heritage (90+ seconds)
 # Good for: Security audits, research, modified code
 export SWH_API_TOKEN=your_token  # Optional but recommended
-src2id /path/to/unknown-code --use-swh
+src2purl /path/to/unknown-code --use-swh
 ```
 
 ### API Authentication
@@ -168,13 +168,13 @@ export SWH_API_TOKEN=your_swh_token
 
 ```bash
 # Generate and validate SWHID for a directory
-src2id-validate /path/to/directory
+src2purl-validate /path/to/directory
 
 # Compare against expected SWHID
-src2id-validate /path/to/directory --expected-swhid swh:1:dir:abc123...
+src2purl-validate /path/to/directory --expected-swhid swh:1:dir:abc123...
 
 # Use fallback implementation
-src2id-validate /path/to/directory --use-fallback --verbose
+src2purl-validate /path/to/directory --use-fallback --verbose
 ```
 
 ### Command Line Options
@@ -202,14 +202,14 @@ src2id-validate /path/to/directory --use-fallback --verbose
 #### **Discovery Method Breakdown**
 ```bash
 # Default: UPMEX + SCANOSS + GitHub (fast)
-src2id /path/to/project
+src2purl /path/to/project
 
 # Add Software Heritage (comprehensive but slow)
-src2id /path/to/project --use-swh
+src2purl /path/to/project --use-swh
 
 # Speed vs Comprehensiveness trade-off
-src2id /path/to/project --no-license-detection  # Faster
-src2id /path/to/project --use-swh --verbose     # Slower but complete
+src2purl /path/to/project --no-license-detection  # Faster
+src2purl /path/to/project --use-swh --verbose     # Slower but complete
 ```
 
 ## License
@@ -218,4 +218,4 @@ This project is licensed under the GNU Affero General Public License v3.0 (AGPL-
 
 ## Status
 
-This project is currently in active development. See the [Issues](https://github.com/oscarvalenzuelab/semantic-copycat-src2id/issues) page for planned features and known issues.
+This project is currently in active development. See the [Issues](https://github.com/oscarvalenzuelab/src2purl/issues) page for planned features and known issues.

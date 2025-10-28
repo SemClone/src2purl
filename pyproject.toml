@@ -3,8 +3,8 @@ requires = ["setuptools>=61.0", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "semantic-copycat-src2id"
-version = "1.3.1"
+name = "src2purl"
+version = "1.3.2"
 description = "Source to ID - Identify package coordinates and repositories from source code using multiple strategies"
 readme = "README.md"
 requires-python = ">=3.9"
@@ -34,9 +34,9 @@ dependencies = [
 ]
 
 [project.urls]
-"Homepage" = "https://github.com/oscarvalenzuelab/semantic-copycat-swh"
-"Bug Tracker" = "https://github.com/oscarvalenzuelab/semantic-copycat-swh/issues"
-"Source Code" = "https://github.com/oscarvalenzuelab/semantic-copycat-swh"
+"Homepage" = "https://github.com/oscarvalenzuelab/src2purl"
+"Bug Tracker" = "https://github.com/oscarvalenzuelab/src2purl/issues"
+"Source Code" = "https://github.com/oscarvalenzuelab/src2purl"
 
 [project.optional-dependencies]
 dev = [
@@ -60,8 +60,8 @@ enhanced = [
 
 
 [project.scripts]
-src2id = "src2id.cli.main:main"
-src2id-validate = "src2id.cli.validate:validate_swhid"
+src2purl = "src2id.cli.main:main"
+src2purl-validate = "src2id.cli.validate:validate_swhid"
 
 [tool.setuptools.packages.find]
 where = ["."]

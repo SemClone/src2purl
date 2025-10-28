@@ -1,12 +1,12 @@
 """
-Source to ID (src2id)
+Source to PURL (src2purl)
 
-A tool for identifying package coordinates and repositories from source code
+A tool for identifying package coordinates and PURLs from source code
 using multiple strategies including SCANOSS, hash search, web search, and
 optionally Software Heritage archive.
 """
 
-__version__ = "1.3.1"
+__version__ = "1.3.2"
 __author__ = "Oscar Valenzuela B."
 
 from src2id.core.config import SWHPIConfig
