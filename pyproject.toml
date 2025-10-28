@@ -56,7 +56,7 @@ swhid = [
     "swh.web>=1.0.0",
 ]
 enhanced = [
-    "semantic-copycat-oslili>=1.3.3",
+    "osslili>=1.3.3",
 ]
 
 

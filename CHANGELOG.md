@@ -147,7 +147,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Falls back to individual requests when official client unavailable
 
 ### Fixed
-- Fixed oslili integration to properly import semantic-copycat-oslili library
+- Fixed oslili integration to properly import osslili library
 - Corrected license detection using LegalAttributionGenerator API
 - Removed duplicate and obsolete methods from oslili integration
 - Fixed directory scanning to traverse subdirectories correctly (not parent directories)
