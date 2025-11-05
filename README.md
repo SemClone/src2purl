@@ -97,7 +97,7 @@ src2purl /path/to/project --confidence-threshold 0.85
 
 ### API Authentication
 
-**⚠️ No API keys required!** The tool works with the free public APIs. API keys only provide enhanced rate limits and additional features.
+**No API keys required!** The tool works with the free public APIs. API keys only provide enhanced rate limits and additional features.
 
 #### Recommended API Keys (Optional)
 
@@ -107,9 +107,9 @@ export GITHUB_TOKEN=your_github_personal_access_token
 ```
 - **Get token**: https://github.com/settings/tokens (no special permissions needed)
 - **Benefits**:
-  - ✅ **Rate limit**: 10 → 5000 requests/hour
-  - ✅ **Better search**: More accurate repository identification
-  - ✅ **No cost**: Completely free
+  - **Rate limit**: 10 → 5000 requests/hour
+  - **Better search**: More accurate repository identification
+  - **No cost**: Completely free
 - **Impact**: Significant improvement for repository discovery
 
 **2. SCANOSS API** - **Nice to Have** (Free, optional)
@@ -118,9 +118,9 @@ export SCANOSS_API_KEY=your_scanoss_key
 ```
 - **Get token**: Register at https://www.scanoss.com
 - **Benefits**:
-  - ✅ **No cost**: Free tier available
-  - ✅ **Enhanced rate limits**: Premium API endpoint
-  - ✅ **Additional features**: Possible extra metadata
+  - **No cost**: Free tier available
+  - **Enhanced rate limits**: Premium API endpoint
+  - **Additional features**: Possible extra metadata
 - **Impact**: Minor improvement (SCANOSS works great without key)
 
 **3. Software Heritage API** - **For Heavy Usage** (Free, only if using `--use-swh`)
@@ -129,8 +129,8 @@ export SWH_API_TOKEN=your_swh_token
 ```
 - **Get token**: Register at https://archive.softwareheritage.org/api/
 - **Benefits**:
-  - ✅ **Bypass rate limits**: No 60-second waits
-  - ✅ **Faster comprehensive scans**: When using `--use-swh`
+  - **Bypass rate limits**: No 60-second waits
+  - **Faster comprehensive scans**: When using `--use-swh`
 - **Impact**: Essential for `--use-swh` flag, not needed for default fast mode
 
 #### Performance Comparison
