@@ -1,81 +1,45 @@
-# SRC2PURL - Source Code to Package URL
+# SRC2PURL - Source Code to Package URL Discovery
 
-A Python tool that identifies package coordinates (name, version, license, PURL) from source code directories using an hybrid discovery strategy with manifest parsing, code fingerprinting, repository search, and Software Heritage archive.
+[![License](https://img.shields.io/badge/License-AGPL--3.0-blue.svg)](https://opensource.org/licenses/AGPL-3.0)
+[![Python 3.8+](https://img.shields.io/badge/python-3.8+-blue.svg)](https://www.python.org/downloads/)
+[![PyPI version](https://img.shields.io/pypi/v/src2purl.svg)](https://pypi.org/project/src2purl/)
 
-## Overview
-
-src2purl uses a **progressive 2-phase discovery strategy** to identify packages:
-
-### **Phase 1: Hash-based Package Discovery** (5-15 seconds)
-**Primary identification using content fingerprinting and repository search:**
-
-1. **Directory & Content Scanning** - Generate SWHIDs for directories and files
-   - ✅ **Complete file tree analysis** with configurable depth
-   - ✅ **SWHID generation** for precise content identification
-   - ✅ **Smart filtering** of binary files and hidden directories
-
-2. **Software Heritage Archive** (Optional) - Deep provenance discovery
-   - ✅ **Most comprehensive** - finds exact source code matches
-   - ✅ **Historical accuracy** - can identify older versions
-   - ⚠️ **Requires opt-in** with `--use-swh` due to longer processing time
-
-3. **Keyword Search** (Fallback) - Multi-platform repository discovery
-   - **GitHub API Search** - Repository identification by keywords
-   - **SCANOSS Fingerprinting** - Code similarity detection via file fingerprints
-   - ✅ **Universal coverage** - finds repositories for any project
-   - ✅ **Fast execution** (~10 seconds total)
-
-### **Phase 2: Manifest-based Validation & Enhancement** (1-3 seconds)
-**Authoritative package metadata extraction and result enhancement:**
-
-4. **UPMEX Manifest Parsing** - Universal Package Metadata Extractor
-   - ✅ **Perfect metadata extraction** from package files (package.json, setup.py, pom.xml, go.mod, Cargo.toml, etc.)
-   - ✅ **Multi-ecosystem support** (PyPI, NPM, Maven, Go, Ruby Gems, PHP, .NET)
-   - ✅ **Complete package info** (name, version, license, PURL)
-   - ✅ **Cross-validation** with Phase 1 results for enhanced accuracy
+A Python tool that identifies package coordinates (name, version, license, PURL) from source code directories using a hybrid discovery strategy with manifest parsing, code fingerprinting, repository search, and Software Heritage archive integration.
 
 ## Features
 
-### **Core Capabilities**
 - **2-Phase Discovery Strategy**: Hash-based identification enhanced by manifest parsing
 - **Multi-Ecosystem Support**: PyPI, NPM, Maven, Go, Ruby Gems, PHP, .NET, and more
-- **Cross-Phase Validation**: UPMEX manifest data validates and enhances hash-based findings
-- **Confidence Scoring**: Multi-factor scoring (85-100% for exact matches)
-- **Package Coordinate Extraction**: Complete metadata (name, version, license, PURL)
-
-### **Performance & Reliability**
-- **Fast by Default**: 5-15 seconds for typical projects (vs 90+ seconds with SWH)
-- **No API Keys Required**: Works well without authentication (SCANOSS, GitHub search)
-- **Optional API Keys**: Enhanced rate limits and accuracy with GitHub/SCANOSS tokens
-- **Persistent Caching**: File-based cache with smart TTL to avoid API rate limits
-- **Rate Limit Handling**: Automatic backoff and retry logic
-
-### **Discovery Methods**
-- **UPMEX Manifest Parsing**: Universal Package Metadata Extractor for all major package ecosystems
-- **SCANOSS Fingerprinting**: 100% accuracy code similarity with detailed license detection
-- **GitHub Repository Search**: Universal coverage repository identification
-- **Software Heritage Archive**: Comprehensive source inventory (opt-in with `--use-swh`)
-
-### **Output & Integration**
-- **Multiple Output Formats**: JSON and table output formats
-- **PURL Generation**: Standard Package URLs for identified packages
-- **Enhanced License Detection**: Integration with oslili for improved license detection
-- **Subcomponent Detection**: Identifies multiple packages within monorepos and complex projects
+- **Fast Performance**: 5-15 seconds for typical projects (vs 90+ seconds with SWH)
+- **SEMCL.ONE Integration**: Works seamlessly with upmex, osslili, and other ecosystem tools
 
 ## Installation
 
-### From Source
-
 ```bash
-git clone https://github.com/oscarvalenzuelab/src2purl.git
+pip install src2purl
+```
+
+For development:
+```bash
+git clone https://github.com/SemClone/src2purl.git
 cd src2purl
 pip install -e .
+```
+
+## Quick Start
+
+```bash
+# Identify package from source code
+src2purl /path/to/source/code
+
+# With Software Heritage archive (comprehensive but slower)
+src2purl /path/to/source --use-swh
 ```
 
 
 ## Usage
 
-### Basic Usage
+### CLI Usage
 
 ```bash
 # Fast discovery (default) - Uses manifest parsing + SCANOSS + GitHub (5-15 seconds)
@@ -92,15 +56,24 @@ src2purl /path/to/source --output-format json
 
 # Detect subcomponents in monorepos
 src2purl /path/to/source --detect-subcomponents
+```
 
-# Skip license detection (faster)
-src2purl /path/to/source --no-license-detection
+### Python API
 
-# Verbose output for debugging
-src2purl /path/to/source --verbose
+```python
+from src2purl import identify_package
 
-# Clear cache and exit
-src2purl --clear-cache
+# Basic identification
+result = identify_package("/path/to/source")
+print(f"Package: {result.name}@{result.version}")
+print(f"PURL: {result.purl}")
+
+# With options
+result = identify_package(
+    path="/path/to/source",
+    use_swh=True,
+    confidence_threshold=0.85
+)
 ```
 
 ### Discovery Strategy Examples
@@ -225,10 +198,61 @@ src2purl /path/to/project --no-license-detection  # Skip license enhancement
 src2purl /path/to/project --use-swh --verbose     # Full discovery with details
 ```
 
+## Integration with SEMCL.ONE
+
+SRC2PURL is a core component of the SEMCL.ONE ecosystem:
+
+- Uses **upmex** for manifest parsing and package metadata extraction
+- Integrates with **osslili** for enhanced license detection
+- Provides PURLs for **purl2src** to download source packages
+- Supports **purl2notices** for generating attribution documentation
+- Enables **ospac** policy evaluation with identified packages
+
+## Configuration
+
+Configuration via environment variables:
+
+```bash
+# API tokens (optional but recommended)
+export GITHUB_TOKEN=your_github_token
+export SCANOSS_API_KEY=your_scanoss_key
+export SWH_API_TOKEN=your_swh_token
+
+# Performance settings
+export SRC2PURL_CACHE_DIR=~/.cache/src2purl
+export SRC2PURL_MAX_DEPTH=2
+```
+
+## Documentation
+
+- [User Guide](docs/user-guide.md) - Comprehensive usage examples
+- [API Reference](docs/api.md) - Python API documentation
+- [Discovery Methods](docs/discovery-methods.md) - Detailed explanation of identification strategies
+- [Examples](docs/examples.md) - Common use cases and workflows
+
+## Contributing
+
+We welcome contributions! Please see [CONTRIBUTING.md](CONTRIBUTING.md) for details on:
+- Code of conduct
+- Development setup
+- Submitting pull requests
+- Reporting issues
+
+## Support
+
+For support and questions:
+- [GitHub Issues](https://github.com/SemClone/src2purl/issues) - Bug reports and feature requests
+- [Documentation](https://github.com/SemClone/src2purl) - Complete project documentation
+- [SEMCL.ONE Community](https://semcl.one) - Ecosystem support and discussions
+
 ## License
 
-This project is licensed under the GNU Affero General Public License v3.0 (AGPL-3.0) - see the LICENSE file for details.
+GNU Affero General Public License v3.0 (AGPL-3.0) - see [LICENSE](LICENSE) file for details.
 
-## Status
+## Authors
 
-This project is currently in active development. See the [Issues](https://github.com/oscarvalenzuelab/src2purl/issues) page for planned features and known issues.
+See [AUTHORS.md](AUTHORS.md) for a list of contributors.
+
+---
+
+*Part of the [SEMCL.ONE](https://semcl.one) ecosystem for comprehensive OSS compliance and code analysis.*
