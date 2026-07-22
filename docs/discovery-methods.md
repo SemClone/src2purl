@@ -53,19 +53,22 @@ def compute_swhid(directory_path):
 
 ### 1.2 GitHub Repository Search
 
-Uses the GitHub API to find repositories matching the SWHID.
+GitHub is used as a supplementary source to find candidate repositories by
+keyword. It does not perform hash or SWHID based matching. GitHub has no
+content hash search, so hash based lookup is handled entirely by Software
+Heritage (see 1.4 Software Heritage Archive).
 
 #### Search Strategy:
 
-1. **File-based Search**: Searches for unique file combinations
-2. **Content Matching**: Matches file contents against GitHub's index
-3. **Repository Metadata**: Extracts package information from found repositories
+1. **Keyword Search**: Queries the GitHub repository search API with the package name and related terms
+2. **Metadata Matching**: Matches against repository metadata such as name, description, and topics, not file contents
+3. **Package Metadata**: Reads packaging files from matched repositories to extract package information
 
 #### API Usage:
 
 ```python
-# Search by file content
-GET https://api.github.com/search/code?q=hash:SWHID
+# Search repositories by keyword (matches repository metadata, not file contents)
+GET https://api.github.com/search/repositories?q={keywords}
 
 # Get repository details
 GET https://api.github.com/repos/{owner}/{repo}
@@ -76,8 +79,10 @@ GET https://api.github.com/repos/{owner}/{repo}/contents/package.json
 
 #### Rate Limits:
 
-- Without token: 10 requests/hour
-- With token: 5000 requests/hour
+The GitHub search API is rate limited separately from the core REST API:
+
+- Without token: 10 requests/minute
+- With token: 30 requests/minute
 
 ### 1.3 SCANOSS Knowledge Base
 
