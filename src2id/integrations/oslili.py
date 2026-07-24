@@ -59,6 +59,8 @@ class OsliliIntegration:
         Returns:
             Dictionary with license information:
             - licenses: List of detected license identifiers
+            - own_licenses: Identifiers eligible to be the project's own license
+            - third_party_licenses: Identifiers from bundled third-party notice files
             - confidence: Confidence score (0-1)
             - files: Dict mapping files to their licenses
             - summary: Human-readable summary
@@ -66,6 +68,8 @@ class OsliliIntegration:
         if not self.available or not self.detector:
             return {
                 "licenses": [],
+                "own_licenses": [],
+                "third_party_licenses": [],
                 "confidence": 0.0,
                 "files": {},
                 "summary": "oslili not available",
@@ -93,7 +97,8 @@ class OsliliIntegration:
 
                 # Prioritize declared licenses, then detected, then referenced,
                 # with bundled third-party licenses last
-                all_licenses = declared + detected + referenced + third_party
+                own = declared + detected + referenced
+                all_licenses = own + third_party
 
                 for license_info in all_licenses:
                     licenses.append(license_info.spdx_id)
@@ -131,6 +136,13 @@ class OsliliIntegration:
                 
                 return {
                     "licenses": licenses,
+                    # Split view of the same licenses: "own" are candidates for the
+                    # project's license, "third_party" come from bundled notice files
+                    # and must not be attributed to the project itself.
+                    "own_licenses": self._deduplicate_licenses([lic.spdx_id for lic in own]),
+                    "third_party_licenses": self._deduplicate_licenses(
+                        [lic.spdx_id for lic in third_party]
+                    ),
                     "confidence": avg_confidence,
                     "files": files,
                     "summary": summary,
@@ -139,6 +151,8 @@ class OsliliIntegration:
             else:
                 return {
                     "licenses": [],
+                    "own_licenses": [],
+                    "third_party_licenses": [],
                     "confidence": 0.0,
                     "files": {},
                     "summary": "No licenses detected",
@@ -148,6 +162,8 @@ class OsliliIntegration:
         except Exception as e:
             return {
                 "licenses": [],
+                "own_licenses": [],
+                "third_party_licenses": [],
                 "confidence": 0.0,
                 "files": {},
                 "summary": f"Error during detection: {e}",
@@ -180,12 +196,16 @@ class OsliliIntegration:
             # Remove duplicates while preserving order
             unique_licenses = self._deduplicate_licenses(license_info["licenses"])
             
-            # Use the most confident license as primary
-            primary_license = unique_licenses[0]
+            # Use the most confident license as primary. Only the project's own
+            # licenses are eligible: a license found in a bundled third-party notice
+            # file belongs to a dependency, so attributing it to this package would
+            # be wrong. When nothing but bundled notices was found we leave
+            # match.license alone rather than guess.
+            own_licenses = self._deduplicate_licenses(license_info.get("own_licenses") or [])
             
             # Update match license if not already set or if ours is more confident
-            if not match.license or license_info["confidence"] > 0.85:
-                match.license = primary_license
+            if own_licenses and (not match.license or license_info["confidence"] > 0.85):
+                match.license = own_licenses[0]
             
             # Add metadata about additional licenses and copyrights
             if not hasattr(match, "metadata"):
@@ -193,6 +213,11 @@ class OsliliIntegration:
             
             if len(unique_licenses) > 1:
                 match.metadata["additional_licenses"] = unique_licenses[1:]
+
+            # Surface bundled third-party licenses separately so callers can report
+            # them without mistaking them for the package's own license
+            if license_info.get("third_party_licenses"):
+                match.metadata["third_party_licenses"] = license_info["third_party_licenses"]
             
             match.metadata["license_confidence"] = license_info["confidence"]
             

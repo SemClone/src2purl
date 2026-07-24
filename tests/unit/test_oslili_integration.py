@@ -160,3 +160,99 @@ class TestEnhancePackageMatch:
 
         assert enhanced.license == "Apache-2.0"
         assert enhanced.metadata["additional_licenses"] == ["GPL-3.0-only"]
+        assert enhanced.metadata["third_party_licenses"] == ["GPL-3.0-only"]
+
+    def test_third_party_only_does_not_become_the_package_license(self, integration):
+        """A bundled dependency license must not be attributed to the package."""
+        detector = integration(
+            [
+                make_license(
+                    "GPL-3.0-only",
+                    "third-party",
+                    confidence=0.99,
+                    source_file="THIRD_PARTY_NOTICES.txt",
+                ),
+            ]
+        )
+        match = SimpleNamespace(license=None, metadata={})
+
+        enhanced = detector.enhance_package_match(match, Path("/some/project"))
+
+        assert enhanced.license is None
+        # ...but it is still reported, just not as the package's own license
+        assert enhanced.metadata["third_party_licenses"] == ["GPL-3.0-only"]
+
+    def test_third_party_only_does_not_overwrite_an_existing_license(self, integration):
+        """A high-confidence bundled notice must not clobber a known license."""
+        detector = integration(
+            [
+                make_license(
+                    "GPL-3.0-only",
+                    "third-party",
+                    confidence=0.99,
+                    source_file="THIRD_PARTY_NOTICES.txt",
+                ),
+            ]
+        )
+        match = SimpleNamespace(license="Apache-2.0", metadata={})
+
+        enhanced = detector.enhance_package_match(match, Path("/some/project"))
+
+        assert enhanced.license == "Apache-2.0"
+        assert enhanced.metadata["third_party_licenses"] == ["GPL-3.0-only"]
+
+    def test_own_license_still_wins_when_only_referenced(self, integration):
+        """A referenced license is still the project's own and remains eligible."""
+        detector = integration(
+            [
+                make_license("MIT", "third-party", source_file="3rdpartylicenses.txt"),
+                make_license("BSD-3-Clause", "referenced", source_file="README.md"),
+            ]
+        )
+        match = SimpleNamespace(license=None, metadata={})
+
+        enhanced = detector.enhance_package_match(match, Path("/some/project"))
+
+        assert enhanced.license == "BSD-3-Clause"
+
+
+class TestDetectLicensesSplitView:
+    """detect_licenses reports own and third-party licenses separately."""
+
+    def test_split_buckets(self, integration):
+        detector = integration(
+            [
+                make_license("Apache-2.0", "declared", source_file="LICENSE"),
+                make_license("BSD-3-Clause", "detected", source_file="src/main.py"),
+                make_license("MIT", "third-party", source_file="THIRD_PARTY_NOTICES.txt"),
+            ]
+        )
+
+        result = detector.detect_licenses(Path("/some/project"))
+
+        assert result["own_licenses"] == ["Apache-2.0", "BSD-3-Clause"]
+        assert result["third_party_licenses"] == ["MIT"]
+        assert result["licenses"] == ["Apache-2.0", "BSD-3-Clause", "MIT"]
+
+    def test_same_license_can_be_both_own_and_third_party(self, integration):
+        """Overlap is reported in both buckets, not resolved by set difference."""
+        detector = integration(
+            [
+                make_license("MIT", "declared", source_file="LICENSE"),
+                make_license("MIT", "third-party", source_file="THIRD_PARTY_NOTICES.txt"),
+            ]
+        )
+
+        result = detector.detect_licenses(Path("/some/project"))
+
+        assert result["own_licenses"] == ["MIT"]
+        assert result["third_party_licenses"] == ["MIT"]
+
+    def test_keys_present_when_nothing_detected(self, integration):
+        """The contract holds on the empty path too."""
+        detector = integration([])
+
+        result = detector.detect_licenses(Path("/some/project"))
+
+        assert result["own_licenses"] == []
+        assert result["third_party_licenses"] == []
