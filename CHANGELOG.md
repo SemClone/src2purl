@@ -5,6 +5,16 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.3.5] - 2026-07-24
+
+### Fixed
+- Third-party licenses are no longer dropped from license aggregation. osslili 1.7.0 categorizes licenses found in bundled notice files (THIRD_PARTY_NOTICES.txt, 3rdpartylicenses.txt) as `third-party` rather than `declared`, and the integration only collected the three legacy categories.
+- A license from a bundled notice file is no longer attributed to the scanned package itself. It belongs to a dependency, so it is recorded but never selected as the package license, including when a scan finds nothing else.
+- Primary-license selection no longer uses a confidence score diluted by bundled notice files. Previously enough high-confidence notices could overwrite an already-known license, and enough low-confidence ones could suppress a confident own license.
+
+### Added
+- `detect_licenses()` reports `own_licenses`, `third_party_licenses` and `own_confidence` alongside the existing keys. The new keys are additive and present on every return path, so existing callers are unaffected.
+
 ## [1.3.4] - 2025-10-27
 
 ### Fixed
