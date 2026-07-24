@@ -83,13 +83,18 @@ class OsliliIntegration:
                 files = {}
                 
                 # Group licenses by category for better understanding
-                declared = [l for l in result.licenses if l.category == "declared"]
-                detected = [l for l in result.licenses if l.category == "detected"]
-                referenced = [l for l in result.licenses if l.category == "referenced"]
-                
-                # Prioritize declared licenses, then detected, then referenced
-                all_licenses = declared + detected + referenced
-                
+                declared = [lic for lic in result.licenses if lic.category == "declared"]
+                detected = [lic for lic in result.licenses if lic.category == "detected"]
+                referenced = [lic for lic in result.licenses if lic.category == "referenced"]
+                # Licenses of bundled dependencies (THIRD_PARTY_NOTICES.txt and
+                # friends), not the project's own license. Kept, but ranked last so
+                # they never win the primary-license selection.
+                third_party = [lic for lic in result.licenses if lic.category == "third-party"]
+
+                # Prioritize declared licenses, then detected, then referenced,
+                # with bundled third-party licenses last
+                all_licenses = declared + detected + referenced + third_party
+
                 for license_info in all_licenses:
                     licenses.append(license_info.spdx_id)
                     confidence_scores.append(license_info.confidence)
