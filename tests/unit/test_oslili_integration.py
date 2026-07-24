@@ -1,7 +1,9 @@
 """Unit tests for the oslili license detection integration."""
 
+import asyncio
 from pathlib import Path
 from types import SimpleNamespace
+from unittest.mock import patch
 
 import pytest
 
@@ -256,3 +258,122 @@ class TestDetectLicensesSplitView:
 
         assert result["own_licenses"] == []
         assert result["third_party_licenses"] == []
+        assert result["own_confidence"] == 0.0
+
+
+class TestOwnConfidence:
+    """Third-party notices must not inflate the score used to pick the own license."""
+
+    def test_own_confidence_excludes_third_party(self, integration):
+        detector = integration(
+            [
+                make_license("Apache-2.0", "detected", confidence=0.5, source_file="a.py"),
+                make_license(
+                    "MIT",
+                    "third-party",
+                    confidence=1.0,
+                    source_file="THIRD_PARTY_NOTICES.txt",
+                ),
+            ]
+        )
+
+        result = detector.detect_licenses(Path("/some/project"))
+
+        # Overall confidence still averages everything that was detected
+        assert result["confidence"] == pytest.approx(0.75)
+        # ...but the own-license score reflects only the own detection
+        assert result["own_confidence"] == pytest.approx(0.5)
+
+    def test_high_confidence_notices_do_not_overwrite_known_license(self, integration):
+        """A weak own detection must not clobber a known license on inflated score.
+
+        Enough high-confidence bundled notices push the aggregate above the 0.85
+        overwrite threshold while the own detection alone stays well below it.
+        """
+        detector = integration(
+            [
+                make_license("BSD-3-Clause", "detected", confidence=0.6, source_file="a.py"),
+                make_license("MIT", "third-party", confidence=1.0, source_file="notices/a.txt"),
+                make_license("ISC", "third-party", confidence=1.0, source_file="notices/b.txt"),
+            ]
+        )
+        match = SimpleNamespace(license="Apache-2.0", metadata={})
+
+        result = detector.detect_licenses(Path("/some/project"))
+        # Aggregate clears the 0.85 overwrite bar purely because of the notices
+        assert result["confidence"] > 0.85
+        assert result["own_confidence"] == pytest.approx(0.6)
+
+        enhanced = detector.enhance_package_match(match, Path("/some/project"))
+
+        # ...so gating on own confidence is what keeps the known license intact
+        assert enhanced.license == "Apache-2.0"
+        assert enhanced.metadata["third_party_licenses"] == ["MIT", "ISC"]
+
+    def test_confident_own_license_still_sets_the_license(self, integration):
+        """The normal path is unchanged: a confident own license is still applied."""
+        detector = integration(
+            [
+                make_license("BSD-3-Clause", "declared", confidence=0.99, source_file="LICENSE"),
+                make_license(
+                    "MIT",
+                    "third-party",
+                    confidence=0.99,
+                    source_file="THIRD_PARTY_NOTICES.txt",
+                ),
+            ]
+        )
+        match = SimpleNamespace(license="Apache-2.0", metadata={})
+
+        enhanced = detector.enhance_package_match(match, Path("/some/project"))
+
+        assert enhanced.license == "BSD-3-Clause"
+
+
+class TestPackageIdentifierLicenseAttribution:
+    """The other direct detect_licenses() caller must not attribute bundled licenses.
+
+    Driven through asyncio.run rather than pytest.mark.asyncio: CI installs only
+    pytest and pytest-cov, so the suite must not depend on pytest-asyncio.
+    """
+
+    def _identify(self, licenses):
+        """Run PackageIdentifier.identify_packages with oslili returning `licenses`."""
+        from src2id.core.package_identifier import PackageIdentifier
+
+        integration = OsliliIntegration.__new__(OsliliIntegration)
+        integration.available = True
+        integration.detector = FakeDetector(licenses)
+
+        async def fake_identify_source(**kwargs):
+            return {
+                "identified": True,
+                "confidence": 0.9,
+                "final_origin": "https://example.com/pkg",
+                "candidates": [],
+            }
+
+        with patch("src2id.core.package_identifier.identify_source", fake_identify_source):
+            with patch("src2id.integrations.oslili.OsliliIntegration", return_value=integration):
+                matches = asyncio.run(PackageIdentifier().identify_packages(Path("/some/project")))
+
+        assert len(matches) == 1
+        return matches[0]
+
+    def test_third_party_only_leaves_license_unset(self):
+        """A bundled dependency license must not identify the package."""
+        match = self._identify(
+            [make_license("MIT", "third-party", source_file="THIRD_PARTY_NOTICES.txt")]
+        )
+
+        assert match.license == ""
+
+    def test_own_license_is_used(self):
+        match = self._identify(
+            [
+                make_license("Apache-2.0", "declared", source_file="LICENSE"),
+                make_license("MIT", "third-party", source_file="THIRD_PARTY_NOTICES.txt"),
+            ]
+        )
+
+        assert match.license == "Apache-2.0"

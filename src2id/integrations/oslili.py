@@ -61,7 +61,8 @@ class OsliliIntegration:
             - licenses: List of detected license identifiers
             - own_licenses: Identifiers eligible to be the project's own license
             - third_party_licenses: Identifiers from bundled third-party notice files
-            - confidence: Confidence score (0-1)
+            - confidence: Confidence score (0-1) across all detections
+            - own_confidence: Confidence score (0-1) across own licenses only
             - files: Dict mapping files to their licenses
             - summary: Human-readable summary
         """
@@ -71,6 +72,7 @@ class OsliliIntegration:
                 "own_licenses": [],
                 "third_party_licenses": [],
                 "confidence": 0.0,
+                "own_confidence": 0.0,
                 "files": {},
                 "summary": "oslili not available",
                 "error": "oslili integration not available"
@@ -117,6 +119,12 @@ class OsliliIntegration:
                 
                 # Calculate average confidence
                 avg_confidence = sum(confidence_scores) / len(confidence_scores) if confidence_scores else 0.8
+
+                # Confidence in the project's own licenses, kept separate so a pile of
+                # high-confidence bundled notice files cannot inflate the score used to
+                # decide the package's own license
+                own_scores = [lic.confidence for lic in own]
+                own_confidence = sum(own_scores) / len(own_scores) if own_scores else 0.0
                 
                 # Generate summary
                 if licenses:
@@ -144,6 +152,7 @@ class OsliliIntegration:
                         [lic.spdx_id for lic in third_party]
                     ),
                     "confidence": avg_confidence,
+                    "own_confidence": own_confidence,
                     "files": files,
                     "summary": summary,
                     "copyrights": [c.to_dict() for c in result.copyrights] if result.copyrights else []
@@ -154,6 +163,7 @@ class OsliliIntegration:
                     "own_licenses": [],
                     "third_party_licenses": [],
                     "confidence": 0.0,
+                    "own_confidence": 0.0,
                     "files": {},
                     "summary": "No licenses detected",
                     "copyrights": []
@@ -165,6 +175,7 @@ class OsliliIntegration:
                 "own_licenses": [],
                 "third_party_licenses": [],
                 "confidence": 0.0,
+                "own_confidence": 0.0,
                 "files": {},
                 "summary": f"Error during detection: {e}",
                 "error": str(e)
@@ -202,9 +213,14 @@ class OsliliIntegration:
             # be wrong. When nothing but bundled notices was found we leave
             # match.license alone rather than guess.
             own_licenses = self._deduplicate_licenses(license_info.get("own_licenses") or [])
-            
-            # Update match license if not already set or if ours is more confident
-            if own_licenses and (not match.license or license_info["confidence"] > 0.85):
+            own_confidence = license_info.get("own_confidence") or 0.0
+
+            # Update match license if not already set or if ours is more confident.
+            # Gated on own_confidence so bundled notices cannot raise the bar-clearing
+            # score for a license they had no part in detecting.
+            if own_licenses and own_confidence > 0.7 and (
+                not match.license or own_confidence > 0.85
+            ):
                 match.license = own_licenses[0]
             
             # Add metadata about additional licenses and copyrights
