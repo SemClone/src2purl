@@ -82,8 +82,12 @@ class PackageIdentifier:
                         
                         if integration.available:
                             license_info = integration.detect_licenses(path)
-                            if license_info["licenses"]:
-                                match.license = ", ".join(license_info["licenses"][:3])
+                            # Only the project's own licenses identify this package;
+                            # licenses from bundled third-party notice files belong
+                            # to its dependencies
+                            own_licenses = license_info.get("own_licenses") or []
+                            if own_licenses:
+                                match.license = ", ".join(own_licenses[:3])
                     except ImportError:
                         pass
                 
