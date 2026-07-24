@@ -310,6 +310,32 @@ class TestOwnConfidence:
         assert enhanced.license == "Apache-2.0"
         assert enhanced.metadata["third_party_licenses"] == ["MIT", "ISC"]
 
+    def test_low_confidence_notices_do_not_suppress_a_confident_own_license(self, integration):
+        """Many weak bundled notices must not drag the aggregate below the gate.
+
+        The mirror image of inflation: a pile of low-confidence notice files pulls
+        the aggregate under 0.7, which must not stop a confident own license from
+        being applied.
+        """
+        detector = integration(
+            [make_license("Apache-2.0", "declared", confidence=0.95, source_file="LICENSE")]
+            + [
+                make_license("MIT", "third-party", confidence=0.1, source_file=f"NOTICE-{i}")
+                for i in range(4)
+            ]
+        )
+        match = SimpleNamespace(license=None, metadata={})
+
+        result = detector.detect_licenses(Path("/some/project"))
+        # The aggregate is dragged well below the 0.7 gate...
+        assert result["confidence"] < 0.7
+        # ...while the own license was detected with high confidence
+        assert result["own_confidence"] == pytest.approx(0.95)
+
+        enhanced = detector.enhance_package_match(match, Path("/some/project"))
+
+        assert enhanced.license == "Apache-2.0"
+
     def test_confident_own_license_still_sets_the_license(self, integration):
         """The normal path is unchanged: a confident own license is still applied."""
         detector = integration(
@@ -353,9 +379,14 @@ class TestPackageIdentifierLicenseAttribution:
                 "candidates": [],
             }
 
-        with patch("src2id.core.package_identifier.identify_source", fake_identify_source):
-            with patch("src2id.integrations.oslili.OsliliIntegration", return_value=integration):
-                matches = asyncio.run(PackageIdentifier().identify_packages(Path("/some/project")))
+        # Bound separately so a single with-statement stays inside the 3.9 syntax
+        # this package supports (parenthesized context managers are 3.10+)
+        patch_source = patch("src2id.core.package_identifier.identify_source", fake_identify_source)
+        patch_oslili = patch(
+            "src2id.integrations.oslili.OsliliIntegration", return_value=integration
+        )
+        with patch_source, patch_oslili:
+            matches = asyncio.run(PackageIdentifier().identify_packages(Path("/some/project")))
 
         assert len(matches) == 1
         return matches[0]

@@ -202,22 +202,24 @@ class OsliliIntegration:
         # Detect licenses
         license_info = self.detect_licenses(path)
         
+        # Only the project's own licenses are eligible to become this package's
+        # license: one found in a bundled third-party notice file belongs to a
+        # dependency, so attributing it here would be wrong. Bundled notices must
+        # therefore neither raise nor lower the bar for the own license, which is
+        # why the decision below uses own_confidence rather than the aggregate.
+        own_licenses = self._deduplicate_licenses(license_info.get("own_licenses") or [])
+        own_confidence = license_info.get("own_confidence") or 0.0
+
         # Update match if we found licenses with good confidence
-        if license_info["licenses"] and license_info["confidence"] > 0.7:
+        if license_info["licenses"] and (
+            license_info["confidence"] > 0.7 or own_confidence > 0.7
+        ):
             # Remove duplicates while preserving order
             unique_licenses = self._deduplicate_licenses(license_info["licenses"])
             
-            # Use the most confident license as primary. Only the project's own
-            # licenses are eligible: a license found in a bundled third-party notice
-            # file belongs to a dependency, so attributing it to this package would
-            # be wrong. When nothing but bundled notices was found we leave
-            # match.license alone rather than guess.
-            own_licenses = self._deduplicate_licenses(license_info.get("own_licenses") or [])
-            own_confidence = license_info.get("own_confidence") or 0.0
-
             # Update match license if not already set or if ours is more confident.
-            # Gated on own_confidence so bundled notices cannot raise the bar-clearing
-            # score for a license they had no part in detecting.
+            # When nothing but bundled notices was found there is no own license, so
+            # match.license is left alone rather than guessed at.
             if own_licenses and own_confidence > 0.7 and (
                 not match.license or own_confidence > 0.85
             ):
