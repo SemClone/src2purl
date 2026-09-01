@@ -5,6 +5,20 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Fixed
+- Keyword search runs only when `--enable-fuzzy` was passed, and only when
+  nothing else identified the source (#59). It ran in phase 1, before the
+  manifest parsing in phase 2 that produces the exact match, so "when exact
+  matches fail", which is what the flag promises, was decided before the step
+  that finds the match had run. Against express@4.18.2 that returned the correct
+  match at 0.85 beside ten npm packages at 0.83, close enough that
+  `--confidence-threshold` cannot separate them, and carrying no PURL so nothing
+  downstream could act on them either.
+- The same fallback inside the Software Heritage path is removed rather than
+  gated, so keyword search now happens once, in one place, for every route.
+
 ## [1.3.5] - 2026-07-24
 
 ### Fixed
