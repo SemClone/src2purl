@@ -141,16 +141,6 @@ class SHPackageIdentifier:
                     if self.config.verbose:
                         console.print("[dim]Skipping Software Heritage (use --use-swh to enable)[/dim]")
 
-                if not all_matches:
-                    # Try keyword search with GitHub and SCANOSS
-                    if self.config.verbose:
-                        console.print("[yellow]Trying web search (GitHub, SCANOSS)[/yellow]")
-
-                    # Try keyword search
-                    keyword_matches = await self._find_keyword_matches(path)
-                    if keyword_matches:
-                        all_matches = keyword_matches
-
                 # Step 1b: Process hash-based matches
                 if all_matches:
                     hash_based_matches = await self._process_matches(all_matches)
@@ -178,6 +168,27 @@ class SHPackageIdentifier:
 
             # Final deduplication and sorting
             final_matches = self._prioritize_and_deduplicate(enhanced_matches)
+
+            # Keyword search is the last resort, and only when it was asked for.
+            # It searches on the project name, so it answers with whatever else
+            # shares that name: running it for express returned ten npm packages
+            # scoring 0.83 against the real one at 0.85, close enough that a
+            # confidence threshold cannot separate them, and carrying no PURL so
+            # nothing downstream can act on them either.
+            #
+            # It also belongs here rather than in phase 1. The flag says fuzzy
+            # runs when exact matches fail, and whether they failed is not known
+            # until the manifest parsing in phase 2 has had its turn.
+            if not final_matches and self.config.enable_fuzzy_matching:
+                if self.config.verbose:
+                    console.print(
+                        "[yellow]Nothing identified - trying keyword search[/yellow]"
+                    )
+                keyword_matches = await self._find_keyword_matches(path)
+                if keyword_matches:
+                    final_matches = self._prioritize_and_deduplicate(
+                        await self._process_matches(keyword_matches)
+                    )
             
             # Step 5: Optionally enhance with oslili license detection
             if enhance_licenses:
@@ -588,14 +599,12 @@ class SHPackageIdentifier:
             for candidate in non_existing_dirs:
                 console.print(f"[yellow]✗ No match for {candidate.path.name} ({candidate.swhid[:12]}...)[/yellow]")
         
-        # Try keyword search fallback if no exact matches and fuzzy is enabled
-        if not all_matches and self.config.enable_fuzzy_matching:
-            if self.config.verbose:
-                console.print("[yellow]No exact matches found - trying keyword search[/yellow]")
-            # Only try keyword search if fuzzy matching is enabled
-            keyword_matches = await self._find_keyword_matches(dir_candidates[0].path if dir_candidates else Path("."))
-            all_matches.extend(keyword_matches)
-        
+        # Keyword search is not run here. It used to be, and that put it before
+        # the manifest parsing in phase 2, so "when exact matches fail", which
+        # is what the flag promises, was decided before the step that finds the
+        # exact match had run. identify_packages runs it once, after everything
+        # else has had its turn.
+
         # Report match summary
         if self.config.verbose and (child_matches > 0 or parent_matches > 0):
             console.print("\n[bold]Match Summary:[/bold]")
